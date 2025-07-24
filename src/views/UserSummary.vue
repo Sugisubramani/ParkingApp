@@ -12,25 +12,27 @@
 
   <!-- 3) Main Content -->
   <div v-else class="dashboard-wrapper">
-    <!-- Now pulls fullname from the real user object -->
     <UserNavbar :username="displayName" />
 
     <div class="scroll-area">
       <h2 class="section-title mb-4">Monthly Summary</h2>
 
-      <!-- Summary Card -->
-      <div class="card shadow-sm p-4 summary-card mb-5">
-        <p class="mb-2"><strong>Total Reservations:</strong> {{ totalReservations }}</p>
-        <p class="mb-2"><strong>Total Hours Parked:</strong> {{ totalHours.toFixed(1) }}</p>
-        <p class="mb-2"><strong>Total Amount Spent:</strong> ₹{{ totalCost.toFixed(2) }}</p>
-        <p class="mb-0"><strong>Most Frequent Lot:</strong> {{ frequentLot || 'N/A' }}</p>
-      </div>
+      <!-- wrap summary + chart side by side -->
+      <div class="summary-chart-wrapper">
+        <!-- Summary Card -->
+        <div class="card shadow-sm p-4 summary-card">
+          <p class="mb-2"><strong>Total Reservations:</strong> {{ totalReservations }}</p>
+          <p class="mb-2"><strong>Total Hours Parked:</strong> {{ totalHours.toFixed(1) }}</p>
+          <p class="mb-2"><strong>Total Amount Spent:</strong> ₹{{ totalCost.toFixed(2) }}</p>
+          <p class="mb-0"><strong>Most Frequent Lot:</strong> {{ frequentLot || 'N/A' }}</p>
+        </div>
 
-      <!-- Bar Chart -->
-      <div class="card shadow-sm p-4 chart-card">
-        <h5 class="card-title mb-3">Times Parked by Lot</h5>
-        <div class="chart-container">
-          <canvas ref="timesChart"></canvas>
+        <!-- Bar Chart -->
+        <div class="card shadow-sm p-4 chart-card">
+          <h5 class="card-title mb-3">Times Parked by Lot</h5>
+          <div class="chart-container">
+            <canvas ref="timesChart"></canvas>
+          </div>
         </div>
       </div>
     </div>
@@ -50,9 +52,9 @@ export default {
 
   data() {
     return {
-      user: null,         // full user object from /user/dashboard
-      dataByLot: [],      // your summary array
-      chart: null,        // Chart.js instance
+      user: null,
+      dataByLot: [],
+      chart: null,
       loading: true,
       error: ''
     }
@@ -60,7 +62,6 @@ export default {
 
   computed: {
     displayName() {
-      // show fullname (your real name) or fallback to email/username
       return this.user?.fullname
         || this.user?.username
         || this.user?.email
@@ -86,7 +87,6 @@ export default {
   },
 
   watch: {
-    // redraw chart when data changes
     dataByLot(newVal) {
       if (newVal.length) this.$nextTick(this.renderChart)
     }
@@ -99,9 +99,7 @@ export default {
       const ctx = canvas.getContext('2d')
       if (!ctx) return
 
-      // destroy old chart
       if (this.chart) {
-        this.chart.stop()
         this.chart.destroy()
         this.chart = null
       }
@@ -113,10 +111,10 @@ export default {
         type: 'bar',
         data: { labels, datasets:[{ label:'Times Parked', data, backgroundColor:'#0d6efd' }] },
         options: {
-          animation:false,
-          responsive:true,
-          maintainAspectRatio:false,
-          scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } }
+          animation: false,
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y:{ beginAtZero:true, ticks:{ precision:0 } } }
         }
       })
     }
@@ -130,7 +128,6 @@ export default {
     }
 
     try {
-      // fetch summary and user in parallel
       const [sumRes, userRes] = await Promise.all([
         axios.get('http://localhost:5000/user/summary', {
           headers:{ Authorization:`Bearer ${token}` }
@@ -140,22 +137,18 @@ export default {
         })
       ])
 
-      // summary endpoint returns [] or array
       this.dataByLot = Array.isArray(sumRes.data.summary)
         ? sumRes.data.summary
         : Array.isArray(sumRes.data)
           ? sumRes.data
           : []
-
-      // dashboard returns full user: { id, fullname, email, username, reservations… }
       this.user = userRes.data
 
-      // draw if we already have data
       if (this.dataByLot.length) this.$nextTick(this.renderChart)
     }
     catch(err) {
       console.error(err)
-      if (err.response?.status===401) {
+      if (err.response?.status === 401) {
         localStorage.clear()
         this.$router.push('/login')
       } else {
@@ -170,13 +163,60 @@ export default {
 </script>
 
 <style scoped>
-.dashboard-wrapper { display:flex; flex-direction:column; height:100vh; }
-.scroll-area { flex:1; overflow-y:auto; padding:2rem 1rem; }
-.loader-container { text-align:center; margin-top:4rem; }
-.loader-text { margin-top:.75rem; font-size:.95rem; color:#666; }
-.section-title { text-align:center; color:#0d6efd; margin-bottom:1.5rem; }
-.summary-card { background:#fff; border-radius:.5rem; max-width:400px; margin:0 auto 2rem; }
-.summary-card p { font-size:.95rem; }
-.chart-card { max-width:600px; margin:0 auto; }
-.chart-container { position:relative; height:300px; }
+.dashboard-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem 1rem;
+}
+.loader-container {
+  text-align: center;
+  margin-top: 4rem;
+}
+.loader-text {
+  margin-top: .75rem;
+  font-size: .95rem;
+  color: #666;
+}
+.section-title {
+  text-align: center;
+  color: #0d6efd;
+  margin-bottom: 1.5rem;
+}
+
+/* new wrapper to align summary + chart */
+.summary-chart-wrapper {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}   
+
+/* summary takes 30% width */
+.summary-card {
+  flex: 0 0 30%;
+  min-width: 250px;
+  background: #fff;
+  border-radius: .5rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,.1);
+  padding: 1.25rem;
+}
+
+/* chart takes remaining width */
+.chart-card {
+  flex: 1;
+  background: #fff;
+  border-radius: .5rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,.1);
+  padding: 1.25rem;
+}
+
+.chart-container {
+  position: relative;
+  height: 300px;
+}
 </style>

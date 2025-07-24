@@ -8,13 +8,13 @@
     {{ error }}
   </div>
 
-  <div v-else class="dashboard-wrapper d-flex flex-column min-vh-100 bg-light">
+  <div v-else class="dashboard-wrapper bg-light d-flex flex-column min-vh-100">
     <UserNavbar :username="user.username || user.email" />
 
     <!-- Booking Modal -->
     <div class="custom-modal" v-if="showModal" @click.self="closeModal">
       <div class="modal-dialog">
-        <div class="modal-content shadow">
+        <div class="modal-content shadow-sm rounded">
           <div class="modal-header bg-primary text-white">
             <h5 class="modal-title">Confirm Booking</h5>
             <button type="button" class="btn-close" @click="closeModal" />
@@ -26,42 +26,48 @@
             <p><strong>Rate/hr:</strong> ₹{{ bookingData.cost }}</p>
             <div class="mb-3">
               <label class="form-label">Vehicle Number</label>
-              <input v-model="vehicleNumber" type="text" class="form-control" placeholder="Enter vehicle number" />
+              <input
+                v-model="vehicleNumber"
+                type="text"
+                class="form-control"
+                placeholder="Enter vehicle number"
+              />
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-outline-secondary" @click="closeModal">
-              Cancel
-            </button>
-            <button class="btn btn-primary" :disabled="!vehicleNumber" @click="confirmBooking">
-              Confirm
-            </button>
+            <button class="btn btn-outline-secondary" @click="closeModal">Cancel</button>
+            <button class="btn btn-primary" :disabled="!vehicleNumber" @click="confirmBooking">Confirm</button>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Main Content -->
-    <section class="main-content flex-grow-1 py-4 d-flex justify-content-center">
-      <div class="container-lg px-4">
-        <!-- Search Bar -->
-        <div class="search-row row mb-4 gx-3 align-items-center">
+    <section class="main-content flex-grow-1 py-4 d-flex justify-content-center overflow-auto">
+      <div class="container-lg px-3">
+        <!-- Search Row -->
+        <div class="row align-items-center g-3 mb-4 search-row">
           <div class="col-auto">
-            <label class="form-label mb-0">Search by:</label>
+            <label class="form-label mb-0 fw-semibold">Search by:</label>
           </div>
           <div class="col-auto">
-            <select v-model="searchField" class="form-select">
+            <select v-model="searchField" class="form-select shadow-sm">
               <option value="location">Location</option>
               <option value="address">Address</option>
               <option value="pincode">Pincode</option>
             </select>
           </div>
           <div class="col">
-            <input v-model="searchQuery" type="text" class="form-control" placeholder="Enter search term" />
+            <input
+              v-model="searchQuery"
+              type="text"
+              class="form-control shadow-sm"
+              placeholder="Enter search term"
+            />
           </div>
         </div>
 
-        <!-- Section Heading -->
+        <!-- Heading -->
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h4 class="fw-bold">Available Parking Lots</h4>
         </div>
@@ -69,19 +75,22 @@
         <!-- Lots Grid -->
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
           <div v-for="lot in filteredLots" :key="lot.id" class="col">
-            <div class="card h-100 shadow-sm border-0">
+            <div class="card h-100 border-0 shadow-sm rounded-3">
               <div class="card-body d-flex flex-column justify-content-between">
                 <div>
-                  <h5 class="card-title mb-1">{{ lot.name }}</h5>
-                  <p class="text-muted mb-2">{{ lot.location }}</p>
-                  <ul class="list-unstyled small">
+                  <h5 class="card-title mb-2 fw-semibold">{{ lot.name }}</h5>
+                  <p class="text-muted small mb-3">{{ lot.location }}</p>
+                  <ul class="list-unstyled mb-0 small">
                     <li><strong>Total:</strong> {{ lot.total_spots }}</li>
                     <li><strong>Free:</strong> {{ lot.available_spots }}</li>
                     <li><strong>Rate:</strong> ₹{{ lot.price_per_hour }}</li>
                   </ul>
                 </div>
-                <button class="btn btn-outline-primary mt-3 w-100" :disabled="lot.available_spots === 0"
-                  @click="openBookingModal(lot)">
+                <button
+                  class="btn btn-outline-primary mt-3 w-100"
+                  :disabled="lot.available_spots === 0"
+                  @click="openBookingModal(lot)"
+                >
                   Book Spot
                 </button>
               </div>
@@ -125,14 +134,10 @@ export default {
       if (!query) return this.lots
 
       return this.lots.filter(lot => {
-        if (
-          this.searchField === 'location' ||
-          this.searchField === 'address'
-        ) {
+        if (this.searchField === 'location' || this.searchField === 'address') {
           return lot.location.toLowerCase().includes(query)
         } else if (this.searchField === 'pincode') {
-          const pincode =
-            lot.location.match(/\b\d{6}\b/)?.[0] || ''
+          const pincode = lot.location.match(/\b\d{6}\b/)?.[0] || ''
           return pincode.includes(query)
         }
         return false
@@ -223,48 +228,43 @@ export default {
   padding: 3rem 0;
 }
 
-/* in <style scoped> */
-.search-row .form-select,
-.search-row .form-control {
-  max-width: none;
-  /* override your old 260px limit */
-}
-
 .loader-text {
   margin-top: 1rem;
   font-size: 1rem;
-  color: #333;
+  color: #555;
 }
 
-.form-select,
-.form-control {
-  max-width: 260px;
+.dashboard-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  background-color: #f9f9f9;
+}
+
+.search-row .form-select,
+.search-row .form-control {
+  max-width: 100%;
+}
+
+.card {
+  transition: box-shadow 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
 }
 
 .card-title {
   font-weight: 600;
 }
 
-.dashboard-wrapper {
-  /* you're already using this, but just to be explicit: */
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  /* or let Bootstrap's min-vh-100 do it */
-}
-
-/* override the default min-height so overflow-y works */
-.main-content {
-  flex: 1 1 0;
-  /* grow, shrink, base-size:0 */
-  min-height: 0;
-  /* <- allow it to shrink */
-  overflow-x: hidden;
-  overflow-y: auto;
-  /* <- enable vertical scrolling */
-}
-
-/* Custom Modal Centered */
+/* Modal */
 .custom-modal {
   position: fixed;
   inset: 0;
