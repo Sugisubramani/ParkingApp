@@ -8,16 +8,16 @@
     {{ error }}
   </div>
 
-  <div v-else class="dashboard-wrapper">
+  <div v-else class="dashboard-wrapper d-flex flex-column min-vh-100 bg-light">
     <UserNavbar :username="user.username || user.email" />
 
     <!-- Booking Modal -->
-    <div class="modal fade" :class="{ show: showModal }" :style="{ display: showModal ? 'block' : 'none' }" @click.self="closeModal">
+    <div class="custom-modal" v-if="showModal" @click.self="closeModal">
       <div class="modal-dialog">
         <div class="modal-content shadow">
           <div class="modal-header bg-primary text-white">
             <h5 class="modal-title">Confirm Booking</h5>
-            <button type="button" class="btn-close" @click="closeModal"></button>
+            <button type="button" class="btn-close" @click="closeModal" />
           </div>
           <div class="modal-body">
             <p><strong>Lot:</strong> {{ bookingData.lotName }}</p>
@@ -30,26 +30,35 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-outline-secondary" @click="closeModal">Cancel</button>
-            <button class="btn btn-primary" :disabled="!vehicleNumber" @click="confirmBooking">Confirm</button>
+            <button class="btn btn-outline-secondary" @click="closeModal">
+              Cancel
+            </button>
+            <button class="btn btn-primary" :disabled="!vehicleNumber" @click="confirmBooking">
+              Confirm
+            </button>
           </div>
         </div>
       </div>
     </div>
-    <div class="modal-backdrop fade" v-if="showModal" :class="{ show: showModal }"></div>
 
     <!-- Main Content -->
-    <section class="main-content bg-light py-4">
+    <section class="main-content flex-grow-1 py-4 d-flex justify-content-center">
       <div class="container-lg px-4">
         <!-- Search Bar -->
-        <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
-          <label class="form-label mb-0">Search by:</label>
-          <select v-model="searchField" class="form-select w-auto">
-            <option value="location">Location</option>
-            <option value="address">Address</option>
-            <option value="pincode">Pincode</option>
-          </select>
-          <input v-model="searchQuery" type="text" class="form-control flex-grow-1" placeholder="Enter search term" />
+        <div class="search-row row mb-4 gx-3 align-items-center">
+          <div class="col-auto">
+            <label class="form-label mb-0">Search by:</label>
+          </div>
+          <div class="col-auto">
+            <select v-model="searchField" class="form-select">
+              <option value="location">Location</option>
+              <option value="address">Address</option>
+              <option value="pincode">Pincode</option>
+            </select>
+          </div>
+          <div class="col">
+            <input v-model="searchQuery" type="text" class="form-control" placeholder="Enter search term" />
+          </div>
         </div>
 
         <!-- Section Heading -->
@@ -71,11 +80,8 @@
                     <li><strong>Rate:</strong> ₹{{ lot.price_per_hour }}</li>
                   </ul>
                 </div>
-                <button
-                  class="btn btn-outline-primary mt-3 w-100"
-                  :disabled="lot.available_spots === 0"
-                  @click="openBookingModal(lot)"
-                >
+                <button class="btn btn-outline-primary mt-3 w-100" :disabled="lot.available_spots === 0"
+                  @click="openBookingModal(lot)">
                   Book Spot
                 </button>
               </div>
@@ -119,10 +125,14 @@ export default {
       if (!query) return this.lots
 
       return this.lots.filter(lot => {
-        if (this.searchField === 'location' || this.searchField === 'address') {
+        if (
+          this.searchField === 'location' ||
+          this.searchField === 'address'
+        ) {
           return lot.location.toLowerCase().includes(query)
         } else if (this.searchField === 'pincode') {
-          const pincode = lot.location.match(/\b\d{6}\b/)?.[0] || ''
+          const pincode =
+            lot.location.match(/\b\d{6}\b/)?.[0] || ''
           return pincode.includes(query)
         }
         return false
@@ -213,6 +223,13 @@ export default {
   padding: 3rem 0;
 }
 
+/* in <style scoped> */
+.search-row .form-select,
+.search-row .form-control {
+  max-width: none;
+  /* override your old 260px limit */
+}
+
 .loader-text {
   margin-top: 1rem;
   font-size: 1rem;
@@ -228,8 +245,40 @@ export default {
   font-weight: 600;
 }
 
+.dashboard-wrapper {
+  /* you're already using this, but just to be explicit: */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  /* or let Bootstrap's min-vh-100 do it */
+}
+
+/* override the default min-height so overflow-y works */
 .main-content {
-  background-color: #f8f9fa;
-  border-top: 1px solid #dee2e6;
+  flex: 1 1 0;
+  /* grow, shrink, base-size:0 */
+  min-height: 0;
+  /* <- allow it to shrink */
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* <- enable vertical scrolling */
+}
+
+/* Custom Modal Centered */
+.custom-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1055;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.modal-dialog {
+  max-width: 500px;
+  width: 100%;
 }
 </style>

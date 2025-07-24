@@ -8,60 +8,98 @@
         <p class="loader-text">Loading reservations…</p>
       </div>
 
-      <div v-else-if="error" class="alert alert-danger text-center mt-4">{{ error }}</div>
+      <div v-else-if="error" class="alert alert-danger text-center mt-4">
+        {{ error }}
+      </div>
 
       <section v-else>
-        <h2 class="section-title mb-4">Your Reservations</h2>
-        <ul v-if="user.reservations?.length" class="list-group reservation-list">
-          <li
+        <h2 class="section-title">Your Reservations</h2>
+
+        <div v-if="user.reservations?.length" class="cards-grid">
+          <div
             v-for="r in user.reservations"
             :key="r.reservation_id"
-            class="list-group-item reservation-item d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center"
+            class="reservation-card"
           >
-            <div class="reservation-info">
-              <span><strong>Lot:</strong> {{ r.lot_name }}</span>
-              <span><strong>Address:</strong> {{ r.lot_address }}</span>
-              <span><strong>Spot:</strong> #{{ r.spot_number }}</span>
-              <span><strong>Vehicle:</strong> {{ r.vehicle_number }}</span>
-              <span><strong>Start:</strong> {{ formatDate(r.start_time) }}</span>
-              <span><strong>End:</strong> {{ r.end_time ? formatDate(r.end_time) : 'Ongoing' }}</span>
+            <div class="card-header">
+              <div class="header-text">
+                <h5 class="lot-name">{{ r.lot_name }}</h5>
+                <small class="lot-address">{{ r.lot_address }}</small>
+              </div>
+              <button
+                class="btn btn-sm btn-warning"
+                @click="releaseSpot(r.reservation_id)"
+              >
+                Release
+              </button>
             </div>
-            <button class="btn btn-outline-warning btn-sm mt-3 mt-md-0" @click="releaseSpot(r.reservation_id)">
-              Release
-            </button>
-          </li>
-        </ul>
-        <p v-else class="text-muted text-center fs-6">No reservations found.</p>
+            <div class="card-body">
+              <div class="info"><strong>Spot:</strong> #{{ r.spot_number }}</div>
+              <div class="info"><strong>Vehicle:</strong> {{ r.vehicle_number }}</div>
+              <div class="info"><strong>Start:</strong> {{ formatDate(r.start_time) }}</div>
+              <div class="info">
+                <strong>End:</strong>
+                {{ r.end_time ? formatDate(r.end_time) : 'Ongoing' }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p v-else class="no-reservations">
+          You have no active reservations.
+        </p>
       </section>
     </div>
-  </div>
 
-  <!-- Release Modal -->
-  <div class="modal fade" tabindex="-1" :class="{ show: showReleaseModal }" style="display: block;" v-if="showReleaseModal">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Release Reservation</h5>
-          <button type="button" class="btn-close" @click="showReleaseModal = false"></button>
-        </div>
-        <div class="modal-body">
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item"><strong>Lot:</strong> {{ activeReservation.lot_name }}</li>
-            <li class="list-group-item"><strong>Spot:</strong> #{{ activeReservation.spot_number }}</li>
-            <li class="list-group-item"><strong>Vehicle:</strong> {{ activeReservation.vehicle_number }}</li>
-            <li class="list-group-item"><strong>Start Time:</strong> {{ formatDate(activeReservation.start_time) }}</li>
-            <li class="list-group-item"><strong>Release Time:</strong> {{ formatDate(now) }}</li>
-            <li class="list-group-item"><strong>Estimated Cost:</strong> ₹{{ estimatedCost }}</li>
-          </ul>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="showReleaseModal = false">Cancel</button>
-          <button class="btn btn-warning" @click="confirmRelease">Release</button>
+    <!-- Release Modal -->
+    <div
+      class="modal fade"
+      tabindex="-1"
+      :class="{ show: showReleaseModal }"
+      style="display: block;"
+      v-if="showReleaseModal"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Release Reservation</h5>
+            <button type="button" class="btn-close" @click="showReleaseModal = false"></button>
+          </div>
+          <div class="modal-body">
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item">
+                <strong>Lot:</strong> {{ activeReservation.lot_name }}
+              </li>
+              <li class="list-group-item">
+                <strong>Spot:</strong> #{{ activeReservation.spot_number }}
+              </li>
+              <li class="list-group-item">
+                <strong>Vehicle:</strong> {{ activeReservation.vehicle_number }}
+              </li>
+              <li class="list-group-item">
+                <strong>Start Time:</strong> {{ formatDate(activeReservation.start_time) }}
+              </li>
+              <li class="list-group-item">
+                <strong>Release Time:</strong> {{ formatDate(now) }}
+              </li>
+              <li class="list-group-item">
+                <strong>Estimated Cost:</strong> ₹{{ estimatedCost }}
+              </li>
+            </ul>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="showReleaseModal = false">
+              Cancel
+            </button>
+            <button class="btn btn-warning" @click="confirmRelease">
+              Release
+            </button>
+          </div>
         </div>
       </div>
     </div>
+    <div v-if="showReleaseModal" class="modal-backdrop fade show"></div>
   </div>
-  <div v-if="showReleaseModal" class="modal-backdrop fade show"></div>
 </template>
 
 <script>
@@ -71,6 +109,7 @@ import UserNavbar from '../components/UserNavbar.vue'
 export default {
   name: 'UserReservations',
   components: { UserNavbar },
+
   data() {
     return {
       user: null,
@@ -94,10 +133,10 @@ export default {
   },
   methods: {
     async fetchReservations() {
-      const token = localStorage.getItem('token')
+      this.loading = true
       try {
         const res = await axios.get('http://localhost:5000/user/dashboard', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         })
         this.user = res.data
       } catch (err) {
@@ -116,13 +155,13 @@ export default {
     formatDate(dateStr) {
       return new Date(dateStr).toLocaleString()
     },
-    async releaseSpot(reservationId) {
+    releaseSpot(reservationId) {
       const reservation = this.user.reservations.find(r => r.reservation_id === reservationId)
-  if (reservation) {
-    this.activeReservation = { ...reservation }
-    this.showReleaseModal = true
-  }
-},
+      if (reservation) {
+        this.activeReservation = { ...reservation }
+        this.showReleaseModal = true
+      }
+    },
     async confirmRelease() {
       try {
         await axios.post(
@@ -131,7 +170,6 @@ export default {
           { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
         )
         this.showReleaseModal = false
-        this.activeReservation = null
         this.fetchReservations()
       } catch (err) {
         console.error(err)
@@ -157,59 +195,85 @@ export default {
 .scroll-area {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 2rem 1rem;
+  padding: 1.5rem 2rem;
 }
 
 .section-title {
-  font-size: 1.625rem;
+  font-size: 1.75rem;
   font-weight: 600;
   color: var(--primary);
   text-align: center;
+  margin-bottom: 1.5rem;
 }
 
 /* Loader */
 .loader-container {
   text-align: center;
-  margin-top: 4rem;
+  margin-top: 2rem;
 }
-
 .loader-text {
-  margin-top: .75rem;
-  color: var(--secondary);
+  margin-top: 0.75rem;
   font-size: 0.95rem;
+  color: var(--secondary);
 }
 
-/* Reservations */
-.reservation-list {
-  padding: 0;
+/* Grid of cards */
+.cards-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   margin-bottom: 2rem;
 }
 
-.reservation-item {
-  background: var(--card-bg);
-  border: none;
+/* Individual reservation card */
+.reservation-card {
+  background: #fff;
   border-radius: 0.5rem;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, .05);
-  padding: 1rem 1.25rem;
-  margin-bottom: 1rem;
-  transition: box-shadow 0.2s ease;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.reservation-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
-.reservation-item:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, .08);
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f9fa;
+  padding: 1rem;
+  border-bottom: 1px solid #e9ecef;
+}
+.header-text h5 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+.header-text small {
+  color: #6c757d;
 }
 
-.reservation-info span {
-  display: block;
+.card-body {
+  padding: 1rem;
+}
+.info {
+  margin-bottom: 0.5rem;
   font-size: 0.95rem;
-  margin-bottom: 0.3rem;
 }
 
-@media (min-width: 768px) {
-  .reservation-info span {
-    display: inline-block;
-    margin-right: 1.5rem;
-    margin-bottom: 0;
-  }
+.btn-warning {
+  background-color: #ffc107;
+  border: none;
+}
+.btn-warning:hover {
+  background-color: #e0a800;
+}
+
+.no-reservations {
+  text-align: center;
+  color: #6c757d;
+  font-size: 1rem;
+  margin-top: 3rem;
 }
 </style>
