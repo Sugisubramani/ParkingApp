@@ -1,40 +1,89 @@
 <template>
-  <div class="dashboard-wrapper">
-    <UserNavbar :username="user?.username || 'User'" />
+  <div v-if="loading" class="loader-container">
+    <div class="spinner-border text-primary" role="status"></div>
+    <p class="loader-text">Loading parking lots…</p>
+  </div>
 
-    <div class="scroll-area">
-      <div v-if="loading" class="loader-container">
-        <div class="spinner-border text-primary" role="status"></div>
-        <p class="loader-text">Loading parking lots…</p>
+  <div v-else-if="error" class="alert alert-danger text-center mt-4">
+    {{ error }}
+  </div>
+
+  <div v-else class="dashboard-wrapper">
+    <UserNavbar :username="user.username || user.email" />
+
+    <!-- Booking Modal -->
+    <div class="modal fade" :class="{ show: showModal }" :style="{ display: showModal ? 'block' : 'none' }" @click.self="closeModal">
+      <div class="modal-dialog">
+        <div class="modal-content shadow">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title">Confirm Booking</h5>
+            <button type="button" class="btn-close" @click="closeModal"></button>
+          </div>
+          <div class="modal-body">
+            <p><strong>Lot:</strong> {{ bookingData.lotName }}</p>
+            <p><strong>Spot #:</strong> {{ bookingData.spotNumber }}</p>
+            <p><strong>User ID:</strong> {{ user.id }}</p>
+            <p><strong>Rate/hr:</strong> ₹{{ bookingData.cost }}</p>
+            <div class="mb-3">
+              <label class="form-label">Vehicle Number</label>
+              <input v-model="vehicleNumber" type="text" class="form-control" placeholder="Enter vehicle number" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary" @click="closeModal">Cancel</button>
+            <button class="btn btn-primary" :disabled="!vehicleNumber" @click="confirmBooking">Confirm</button>
+          </div>
+        </div>
       </div>
+    </div>
+    <div class="modal-backdrop fade" v-if="showModal" :class="{ show: showModal }"></div>
 
-      <div v-else-if="error" class="alert alert-danger text-center mt-4">{{ error }}</div>
+    <!-- Main Content -->
+    <section class="main-content bg-light py-4">
+      <div class="container-lg px-4">
+        <!-- Search Bar -->
+        <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+          <label class="form-label mb-0">Search by:</label>
+          <select v-model="searchField" class="form-select w-auto">
+            <option value="location">Location</option>
+            <option value="address">Address</option>
+            <option value="pincode">Pincode</option>
+          </select>
+          <input v-model="searchQuery" type="text" class="form-control flex-grow-1" placeholder="Enter search term" />
+        </div>
 
-      <section v-else>
-        <h4 class="section-title">Available Parking Lots</h4>
-        <div class="lot-grid row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-          <div v-for="lot in lots" :key="lot.id" class="col">
-            <div class="card lot-card h-100">
+        <!-- Section Heading -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="fw-bold">Available Parking Lots</h4>
+        </div>
+
+        <!-- Lots Grid -->
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+          <div v-for="lot in filteredLots" :key="lot.id" class="col">
+            <div class="card h-100 shadow-sm border-0">
               <div class="card-body d-flex flex-column justify-content-between">
                 <div>
-                  <h5 class="lot-name">{{ lot.name }}</h5>
-                  <p class="lot-location mb-2">{{ lot.location }}</p>
-                  <div><strong>Total:</strong> {{ lot.total_spots }}</div>
-                  <div><strong>Available:</strong> {{ lot.available_spots }}</div>
+                  <h5 class="card-title mb-1">{{ lot.name }}</h5>
+                  <p class="text-muted mb-2">{{ lot.location }}</p>
+                  <ul class="list-unstyled small">
+                    <li><strong>Total:</strong> {{ lot.total_spots }}</li>
+                    <li><strong>Free:</strong> {{ lot.available_spots }}</li>
+                    <li><strong>Rate:</strong> ₹{{ lot.price_per_hour }}</li>
+                  </ul>
                 </div>
                 <button
-                  class="btn btn-primary mt-3"
+                  class="btn btn-outline-primary mt-3 w-100"
                   :disabled="lot.available_spots === 0"
-                  @click="reserveSpot(lot.id)"
+                  @click="openBookingModal(lot)"
                 >
-                  Reserve
+                  Book Spot
                 </button>
               </div>
             </div>
           </div>
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -47,50 +96,107 @@ export default {
   components: { UserNavbar },
   data() {
     return {
-      lots: [],
       user: null,
+      lots: [],
       loading: true,
-      error: ''
+      error: '',
+      showModal: false,
+      vehicleNumber: '',
+      searchField: 'location',
+      searchQuery: '',
+      bookingData: {
+        lotId: null,
+        lotName: '',
+        spotNumber: null,
+        reservationId: null,
+        cost: 0
+      }
+    }
+  },
+  computed: {
+    filteredLots() {
+      const query = this.searchQuery.trim().toLowerCase()
+      if (!query) return this.lots
+
+      return this.lots.filter(lot => {
+        if (this.searchField === 'location' || this.searchField === 'address') {
+          return lot.location.toLowerCase().includes(query)
+        } else if (this.searchField === 'pincode') {
+          const pincode = lot.location.match(/\b\d{6}\b/)?.[0] || ''
+          return pincode.includes(query)
+        }
+        return false
+      })
     }
   },
   methods: {
     async fetchData() {
+      this.loading = true
+      this.error = ''
       const token = localStorage.getItem('token')
       try {
-        const userRes = await axios.get('http://localhost:5000/user/dashboard', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const [userRes, lotsRes] = await Promise.all([
+          axios.get('http://localhost:5000/user/dashboard', {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axios.get('http://localhost:5000/user/lots', {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        ])
         this.user = userRes.data
-
-        const lotsRes = await axios.get('http://localhost:5000/user/lots', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
         this.lots = lotsRes.data
       } catch (err) {
-        console.error(err)
         if (err.response?.status === 401) {
           this.error = 'Session expired. Please log in again.'
           localStorage.clear()
           this.$router.push('/login')
         } else {
-          this.error = 'Failed to load parking lots.'
+          this.error = 'Failed to load data.'
         }
       } finally {
         this.loading = false
       }
     },
-    async reserveSpot(lotId) {
+    async openBookingModal(lot) {
+      const token = localStorage.getItem('token')
+      try {
+        const res = await axios.post(
+          'http://localhost:5000/user/assign',
+          { lot_id: lot.id },
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        this.bookingData = {
+          lotId: lot.id,
+          lotName: lot.name,
+          spotNumber: res.data.spot_number,
+          reservationId: res.data.reservation_id,
+          cost: res.data.cost
+        }
+        this.vehicleNumber = ''
+        this.showModal = true
+      } catch (err) {
+        alert(err.response?.data?.msg || 'Could not hold a spot.')
+      }
+    },
+    async confirmBooking() {
+      const token = localStorage.getItem('token')
       try {
         await axios.post(
           'http://localhost:5000/user/reserve',
-          { lot_id: lotId },
-          { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+          {
+            reservation_id: this.bookingData.reservationId,
+            vehicle_number: this.vehicleNumber
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
         )
-        this.fetchData()
+        this.showModal = false
+        this.$router.push('/user/reservations')
       } catch (err) {
-        console.error(err)
-        alert(err.response?.data?.msg || 'Failed to reserve spot.')
+        alert(err.response?.data?.msg || 'Booking failed.')
       }
+    },
+    closeModal() {
+      this.showModal = false
     }
   },
   mounted() {
@@ -100,60 +206,30 @@ export default {
 </script>
 
 <style scoped>
-.dashboard-wrapper {
+.loader-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  background: var(--bg);
-  color: var(--text);
+  align-items: center;
+  padding: 3rem 0;
 }
 
-.scroll-area {
-  flex-grow: 1;
-  overflow-y: auto;
-  padding: 2rem 1rem;
-}
-
-.section-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: 1.5rem;
-  color: var(--primary);
-  text-align: center;
-}
-
-/* Loader */
-.loader-container {
-  text-align: center;
-  margin-top: 4rem;
-}
 .loader-text {
-  margin-top: .75rem;
-  color: var(--secondary);
+  margin-top: 1rem;
+  font-size: 1rem;
+  color: #333;
 }
 
-/* Lot Cards */
-.lot-grid {
-  margin-top: 1rem;
+.form-select,
+.form-control {
+  max-width: 260px;
 }
-.lot-card {
-  background: var(--card-bg);
-  border: none;
-  border-radius: .5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
-  transition: transform .2s ease, box-shadow .2s ease;
-}
-.lot-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, .12);
-}
-.lot-name {
-  font-size: 1.25rem;
+
+.card-title {
   font-weight: 600;
-  margin-bottom: .25rem;
 }
-.lot-location {
-  font-size: .95rem;
-  color: var(--secondary);
+
+.main-content {
+  background-color: #f8f9fa;
+  border-top: 1px solid #dee2e6;
 }
 </style>

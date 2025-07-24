@@ -10,7 +10,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from models import db, User, ParkingLot, ParkingSpot, Reservation
 from flask import request
-from datetime import datetime
+import math
+from sqlalchemy import func
 import traceback
 
 
@@ -356,44 +357,33 @@ def delete_spot(lot_id, spot_id):
     db.session.commit()
     return jsonify(msg='Spot deleted'), 200
 
-@app.route('/user/reserve', methods=['POST'])
+
+@app.route('/user/reserve', methods=['POST'], endpoint='user_confirm_reservation')
 @jwt_required()
-def reserve_spot():
-     user_id = get_jwt_identity()
-     data = request.get_json()
-     lot_id = data.get('lot_id')
+def user_confirm_reservation():
+    user_id = get_jwt_identity()
+    data = request.get_json() or {}
 
-     lot = ParkingLot.query.get(lot_id)
-     if not lot:
-         return jsonify({"msg": "Parking lot not found"}), 404
+    resv_id = data.get('reservation_id')
+    vehicle = data.get('vehicle_number')
+    if not resv_id or not vehicle:
+        return jsonify(msg='reservation_id and vehicle_number are required'), 400
 
-     # Find first available spot
-     available_spot = next((s for s in lot.spots if not s.is_reserved), None)
-     if not available_spot:
-         return jsonify({"msg": "No available spots in this lot"}), 400
+    try:
+        resv_id = int(resv_id)
+    except (ValueError, TypeError):
+        return jsonify(msg='Invalid reservation ID'), 400
 
-     available_spot.is_reserved = True
-     reservation = Reservation(
-        user_id=user_id,
-        spot_id=available_spot.id,
-        start_time=datetime.utcnow()
-    )
-     reservation = Reservation(
-        user_id=user_id,
-        lot_id=lot.id,                # ← add this
-        spot_id=available_spot.id,
-        start_time=datetime.utcnow()
-    )
+    reservation = Reservation.query.filter_by(id=resv_id, user_id=user_id).first()
+    if not reservation:
+        return jsonify(msg='Reservation not found'), 404
 
-     db.session.add(reservation)
-     db.session.commit()
+    reservation.vehicle_number = vehicle
+    reservation.start_time = reservation.start_time or datetime.utcnow()
 
-     return jsonify({
-         "msg": "Reservation successful",
-         "spot_number": available_spot.spot_number,
-         "lot": lot.name,
-         "reservation_id": reservation.id
-     }), 201
+    db.session.commit()
+    return jsonify(msg='Booking confirmed'), 200
+
 
 
 
@@ -415,22 +405,69 @@ def user_dashboard():
         lot  = ParkingLot.query.get(res.lot_id)
 
         reservations.append({
-            "reservation_id": res.id,
-            "lot_name":       lot.name if lot else "",
-            "spot_number":    spot.spot_number if spot else "",
-            "start_time":     res.start_time.isoformat(),
-            "end_time":       res.end_time.isoformat() if res.end_time else None,
-            "cost":           getattr(res, 'cost', 0)
+            "reservation_id":  res.id,
+            "lot_name":        lot.name if lot else "",
+            "lot_address": lot.location if lot else "",  # ✅ Correct
+            "spot_number":     spot.spot_number if spot else "",
+            "vehicle_number":  res.vehicle_number,                # ✅ fixed
+            "start_time":      res.start_time.isoformat(),
+            "end_time":        res.end_time.isoformat() if res.end_time else None,
+            "cost":            getattr(res, 'cost', 0)
         })
 
     return jsonify({
-        # swap out the removed field:
-        "username":    user.fullname,   # ← use fullname instead of username
-        "email":       user.email,
+        'id':          user.id,
+        "username":    user.fullname,  # ✅ good call using fullname
+        "email":       user.email,  
         "reservations": reservations
     }), 200
 
 
+@app.route('/user/summary', methods=['GET'])
+@jwt_required()
+def user_summary():
+    user_id = get_jwt_identity()
+
+    # 1) Define start of current month
+    now = datetime.utcnow()
+    month_start = datetime(now.year, now.month, 1)
+
+    # 2) Query and group by lot
+    results = (
+        db.session.query(
+            ParkingLot.name.label('lot_name'),
+            func.count(Reservation.id).label('times_parked'),
+            func.sum(
+                func.strftime('%s', Reservation.end_time) -
+                func.strftime('%s', Reservation.start_time)
+            ).label('total_time_secs'),
+            func.sum(
+                (func.strftime('%s', Reservation.end_time) -
+                 func.strftime('%s', Reservation.start_time)) /
+                3600.0 * ParkingLot.price_per_hour
+            ).label('total_cost')
+        )
+        .join(Reservation, Reservation.lot_id == ParkingLot.id)
+        .filter(
+            Reservation.user_id == user_id,
+            Reservation.start_time >= month_start,
+            Reservation.end_time.isnot(None)
+        )
+        .group_by(ParkingLot.id)
+        .all()
+    )
+
+    # 3) Format results
+    summary = []
+    for row in results:
+        summary.append({
+            'lot_name': row.lot_name,
+            'times_parked': int(row.times_parked or 0),
+            'total_time_minutes': (row.total_time_secs or 0) / 60,
+            'total_cost': round(row.total_cost or 0, 2)
+        })
+
+    return jsonify(summary), 200
 
 @app.route('/user/lots', methods=['GET'])
 @jwt_required()
@@ -442,14 +479,16 @@ def get_all_lots():
         total_spots = len(lot.spots)
         available_spots = len([s for s in lot.spots if not s.is_reserved])
         result.append({
-            'id': lot.id,
-            'name': lot.name,
-            'location': lot.location,
-            'total_spots': total_spots,
-            'available_spots': available_spots
-        })
+  'id': lot.id,
+  'name': lot.name,
+  'location': lot.location,
+  'total_spots': total_spots,
+  'available_spots': available_spots,
+  'price_per_hour': lot.price_per_hour
+})
 
     return jsonify(result), 200
+
 
 
 @app.route('/user/release', methods=['POST'])
@@ -611,6 +650,119 @@ def admin_list_users():
         'pincode':  u.pincode
     } for u in unique]
     return jsonify(users=result), 200
+
+@app.route('/api/reservations/assign', methods=['POST'])
+@jwt_required()
+def assign_reservation():
+    user_id = get_jwt_identity()
+    data = request.get_json() or {}
+    lot_id = data.get('lot_id')
+    if not lot_id:
+        return jsonify(message='lot_id required'), 400
+
+    lot = ParkingLot.query.get(lot_id)
+    if not lot:
+        return jsonify(message='Lot not found'), 404
+
+    spot = ParkingSpot.query.filter_by(
+        lot_id=lot_id,
+        is_reserved=False
+    ).first()
+
+    if not spot:
+        return jsonify(message='No spots available'), 400
+
+    # Create reservation immediately
+    new_reservation = Reservation(
+        user_id=user_id,
+        lot_id=lot.id,
+        spot_id=spot.id,
+        vehicle_number='',          # ← to be filled later
+        start_time=None,
+        end_time=None
+    )
+    db.session.add(new_reservation)
+    db.session.commit()
+
+    # Mark spot as reserved
+    spot.is_reserved = True
+    db.session.commit()
+
+    return jsonify({
+        'reservation_id': new_reservation.id,
+        'spot_number': spot.spot_number,
+        'cost': lot.price_per_hour
+    }), 201
+
+@app.route('/user/assign', methods=['POST'])
+@jwt_required()
+def assign_spot():
+    user_id = get_jwt_identity()
+    data = request.get_json() or {}
+    lot_id = data.get('lot_id')
+    if not lot_id:
+        return jsonify(msg='lot_id required'), 400
+
+    lot = ParkingLot.query.get(lot_id)
+    if not lot:
+        return jsonify(msg='Lot not found'), 404
+
+    # pick first free spot
+    spot = next((s for s in lot.spots if not s.is_reserved), None)
+    if not spot:
+        return jsonify(msg='No spots available'), 400
+
+    # mark it “held” so nobody else grabs it
+    spot.is_reserved = True
+
+    # create a PENDING reservation row
+    new_resv = Reservation(
+        user_id=user_id,
+        lot_id=lot.id,
+        spot_id=spot.id,
+        start_time=datetime.utcnow(),
+        end_time=None,
+        vehicle_number=''   # fill on confirm
+    )
+    db.session.add(new_resv)
+    db.session.commit()
+
+    return jsonify({
+        'reservation_id': new_resv.id,
+        'spot_number': spot.spot_number,
+        'cost': lot.price_per_hour
+    }), 200 
+
+@app.route('/api/reservations/confirm', methods=['POST'], endpoint='api_confirm_reservation')
+@jwt_required()
+def api_confirm_reservation():
+
+    user_id = get_jwt_identity()
+    data = request.get_json() or {}
+
+    resv_id = data.get('reservation_id')
+    vehicle = data.get('vehicle_number')
+
+    if not resv_id or not vehicle:
+        return jsonify(message='Missing data'), 400
+
+    reservation = Reservation.query.get(resv_id)
+    if not reservation or reservation.user_id != user_id:
+        return jsonify(message='Reservation not found'), 404
+
+    if reservation.end_time:
+        return jsonify(message='Reservation already completed'), 400
+
+    # Fill details
+    reservation.vehicle_number = vehicle
+    reservation.start_time = datetime.utcnow()
+
+    # Mark spot as reserved
+    spot = ParkingSpot.query.get(reservation.spot_id)
+    spot.is_reserved = True
+
+    db.session.commit()
+    return jsonify(message='Booking confirmed'), 200
 
 
 

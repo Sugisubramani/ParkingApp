@@ -48,7 +48,6 @@ class ParkingSpot(db.Model):
     spot_number  = db.Column(db.Integer,                     nullable=False)
     is_reserved  = db.Column(db.Boolean, default=False)
 
-    # Each spot can have many reservations over time
     reservations = db.relationship('Reservation', backref='spot', lazy=True)
 
 

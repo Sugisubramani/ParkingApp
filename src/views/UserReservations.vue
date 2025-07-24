@@ -20,14 +20,13 @@
           >
             <div class="reservation-info">
               <span><strong>Lot:</strong> {{ r.lot_name }}</span>
+              <span><strong>Address:</strong> {{ r.lot_address }}</span>
               <span><strong>Spot:</strong> #{{ r.spot_number }}</span>
+              <span><strong>Vehicle:</strong> {{ r.vehicle_number }}</span>
               <span><strong>Start:</strong> {{ formatDate(r.start_time) }}</span>
               <span><strong>End:</strong> {{ r.end_time ? formatDate(r.end_time) : 'Ongoing' }}</span>
             </div>
-            <button
-              class="btn btn-outline-warning btn-sm mt-3 mt-md-0"
-              @click="releaseSpot(r.reservation_id)"
-            >
+            <button class="btn btn-outline-warning btn-sm mt-3 mt-md-0" @click="releaseSpot(r.reservation_id)">
               Release
             </button>
           </li>
@@ -36,6 +35,33 @@
       </section>
     </div>
   </div>
+
+  <!-- Release Modal -->
+  <div class="modal fade" tabindex="-1" :class="{ show: showReleaseModal }" style="display: block;" v-if="showReleaseModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Release Reservation</h5>
+          <button type="button" class="btn-close" @click="showReleaseModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item"><strong>Lot:</strong> {{ activeReservation.lot_name }}</li>
+            <li class="list-group-item"><strong>Spot:</strong> #{{ activeReservation.spot_number }}</li>
+            <li class="list-group-item"><strong>Vehicle:</strong> {{ activeReservation.vehicle_number }}</li>
+            <li class="list-group-item"><strong>Start Time:</strong> {{ formatDate(activeReservation.start_time) }}</li>
+            <li class="list-group-item"><strong>Release Time:</strong> {{ formatDate(now) }}</li>
+            <li class="list-group-item"><strong>Estimated Cost:</strong> ₹{{ estimatedCost }}</li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="showReleaseModal = false">Cancel</button>
+          <button class="btn btn-warning" @click="confirmRelease">Release</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div v-if="showReleaseModal" class="modal-backdrop fade show"></div>
 </template>
 
 <script>
@@ -49,7 +75,21 @@ export default {
     return {
       user: null,
       loading: true,
-      error: ''
+      error: '',
+      showReleaseModal: false,
+      activeReservation: null
+    }
+  },
+  computed: {
+    now() {
+      return new Date().toISOString()
+    },
+    estimatedCost() {
+      if (!this.activeReservation) return 0
+      const start = new Date(this.activeReservation.start_time)
+      const end = new Date()
+      const hours = Math.ceil((end - start) / (1000 * 60 * 60)) || 1
+      return hours * 20 // ₹20/hour
     }
   },
   methods: {
@@ -77,12 +117,21 @@ export default {
       return new Date(dateStr).toLocaleString()
     },
     async releaseSpot(reservationId) {
+      const reservation = this.user.reservations.find(r => r.reservation_id === reservationId)
+  if (reservation) {
+    this.activeReservation = { ...reservation }
+    this.showReleaseModal = true
+  }
+},
+    async confirmRelease() {
       try {
         await axios.post(
           'http://localhost:5000/user/release',
-          { reservation_id: reservationId },
+          { reservation_id: this.activeReservation.reservation_id },
           { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
         )
+        this.showReleaseModal = false
+        this.activeReservation = null
         this.fetchReservations()
       } catch (err) {
         console.error(err)
@@ -123,6 +172,7 @@ export default {
   text-align: center;
   margin-top: 4rem;
 }
+
 .loader-text {
   margin-top: .75rem;
   color: var(--secondary);
@@ -134,6 +184,7 @@ export default {
   padding: 0;
   margin-bottom: 2rem;
 }
+
 .reservation-item {
   background: var(--card-bg);
   border: none;
@@ -143,14 +194,17 @@ export default {
   margin-bottom: 1rem;
   transition: box-shadow 0.2s ease;
 }
+
 .reservation-item:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, .08);
 }
+
 .reservation-info span {
   display: block;
   font-size: 0.95rem;
   margin-bottom: 0.3rem;
 }
+
 @media (min-width: 768px) {
   .reservation-info span {
     display: inline-block;

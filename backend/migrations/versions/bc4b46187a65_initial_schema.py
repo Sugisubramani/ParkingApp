@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: 80186d350378
+Revision ID: bc4b46187a65
 Revises: 
-Create Date: 2025-07-23 16:17:34.049477
+Create Date: 2025-07-24 15:05:16.997172
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '80186d350378'
+revision = 'bc4b46187a65'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -55,6 +55,7 @@ def upgrade():
     sa.Column('spot_id', sa.Integer(), nullable=False),
     sa.Column('start_time', sa.DateTime(), nullable=True),
     sa.Column('end_time', sa.DateTime(), nullable=True),
+    sa.Column('vehicle_number', sa.String(length=50), nullable=False),
     sa.ForeignKeyConstraint(['lot_id'], ['parking_lot.id'], ),
     sa.ForeignKeyConstraint(['spot_id'], ['parking_spot.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
