@@ -12,31 +12,48 @@
     <UserNavbar :username="user.username || user.email" />
 
     <!-- Booking Modal -->
-    <div class="custom-modal" v-if="showModal" @click.self="closeModal">
+    <div class="booking-modal" v-if="showModal" @click.self="closeModal">
       <div class="modal-dialog">
-        <div class="modal-content shadow-sm rounded">
-          <div class="modal-header bg-primary text-white">
-            <h5 class="modal-title">Confirm Booking</h5>
-            <button type="button" class="btn-close" @click="closeModal" />
+        <div class="modal-content shadow rounded-4">
+          <div class="modal-header bg-dark text-white px-4 py-3">
+            <h5 class="modal-title fw-semibold">Confirm Parking Spot</h5>
+            <button type="button" class="btn-close btn-close-white" @click="closeModal" />
           </div>
-          <div class="modal-body">
-            <p><strong>Lot:</strong> {{ bookingData.lotName }}</p>
-            <p><strong>Spot #:</strong> {{ bookingData.spotNumber }}</p>
-            <p><strong>User ID:</strong> {{ user.id }}</p>
-            <p><strong>Rate/hr:</strong> ₹{{ bookingData.cost }}</p>
+          <div class="modal-body px-4 py-3">
             <div class="mb-3">
-              <label class="form-label">Vehicle Number</label>
-              <input
-                v-model="vehicleNumber"
-                type="text"
-                class="form-control"
-                placeholder="Enter vehicle number"
-              />
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted">Parking Lot</span>
+                <strong>{{ bookingData.lotName }}</strong>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted">Spot Number</span>
+                <strong>#{{ bookingData.spotNumber }}</strong>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted">User ID</span>
+                <strong>{{ user.id }}</strong>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted">Rate per Hour</span>
+                <strong class="text-success">₹{{ bookingData.cost }}</strong>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted">Start Time</span>
+                <strong>{{ formatDateIST(bookingData.startTime) }}</strong>
+              </div>
+            </div>
+            <hr />
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Enter Vehicle Number</label>
+              <input v-model="vehicleNumber" type="text" class="form-control form-control-lg shadow-sm"
+                placeholder="e.g. TN01AB1234" />
             </div>
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-outline-secondary" @click="closeModal">Cancel</button>
-            <button class="btn btn-primary" :disabled="!vehicleNumber" @click="confirmBooking">Confirm</button>
+          <div class="modal-footer bg-light px-4 py-3 d-flex justify-content-between">
+            <button class="btn btn-outline-dark" @click="closeModal">Cancel</button>
+            <button class="btn btn-success px-4" :disabled="!vehicleNumber" @click="confirmBooking">
+              Confirm Booking
+            </button>
           </div>
         </div>
       </div>
@@ -48,22 +65,14 @@
         <!-- Search Row -->
         <div class="row align-items-center g-3 mb-4 search-row">
           <div class="col-auto">
-            <label class="form-label mb-0 fw-semibold">Search by:</label>
-          </div>
-          <div class="col-auto">
-            <select v-model="searchField" class="form-select shadow-sm">
-              <option value="location">Location</option>
-              <option value="address">Address</option>
+            <select v-model="searchField" class="form-select styled-dropdown">
+              <option value="name">Lot Name</option>
+              <option value="location">Address</option>
               <option value="pincode">Pincode</option>
             </select>
           </div>
           <div class="col">
-            <input
-              v-model="searchQuery"
-              type="text"
-              class="form-control shadow-sm"
-              placeholder="Enter search term"
-            />
+            <input v-model="searchQuery" type="text" class="form-control shadow-sm" placeholder="Search..." />
           </div>
         </div>
 
@@ -79,18 +88,16 @@
               <div class="card-body d-flex flex-column justify-content-between">
                 <div>
                   <h5 class="card-title mb-2 fw-semibold">{{ lot.name }}</h5>
-                  <p class="text-muted small mb-3">{{ lot.location }}</p>
+                  <p class="text-muted small mb-0">{{ lot.location }}</p>
+                  <p class="text-muted small mb-3">Pincode: {{ lot.pincode || 'N/A' }}</p>
                   <ul class="list-unstyled mb-0 small">
                     <li><strong>Total:</strong> {{ lot.total_spots }}</li>
                     <li><strong>Free:</strong> {{ lot.available_spots }}</li>
                     <li><strong>Rate:</strong> ₹{{ lot.price_per_hour }}</li>
                   </ul>
                 </div>
-                <button
-                  class="btn btn-outline-primary mt-3 w-100"
-                  :disabled="lot.available_spots === 0"
-                  @click="openBookingModal(lot)"
-                >
+                <button class="btn btn-outline-primary mt-3 w-100" :disabled="lot.available_spots === 0"
+                  @click="openBookingModal(lot)">
                   Book Spot
                 </button>
               </div>
@@ -105,6 +112,8 @@
 <script>
 import axios from 'axios'
 import UserNavbar from '../components/UserNavbar.vue'
+import { DateTime } from 'luxon';
+
 
 export default {
   name: 'UserLots',
@@ -124,23 +133,18 @@ export default {
         lotName: '',
         spotNumber: null,
         reservationId: null,
-        cost: 0
+        cost: 0,
+        startTime: null    // ← initialize here
       }
     }
   },
   computed: {
     filteredLots() {
-      const query = this.searchQuery.trim().toLowerCase()
-      if (!query) return this.lots
-
+      const q = this.searchQuery.trim().toLowerCase()
+      if (!q) return this.lots
       return this.lots.filter(lot => {
-        if (this.searchField === 'location' || this.searchField === 'address') {
-          return lot.location.toLowerCase().includes(query)
-        } else if (this.searchField === 'pincode') {
-          const pincode = lot.location.match(/\b\d{6}\b/)?.[0] || ''
-          return pincode.includes(query)
-        }
-        return false
+        const val = (lot[this.searchField] || '').toString().toLowerCase()
+        return val.includes(q)
       })
     }
   },
@@ -151,12 +155,8 @@ export default {
       const token = localStorage.getItem('token')
       try {
         const [userRes, lotsRes] = await Promise.all([
-          axios.get('http://localhost:5000/user/dashboard', {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          axios.get('http://localhost:5000/user/lots', {
-            headers: { Authorization: `Bearer ${token}` }
-          })
+          axios.get('http://localhost:5000/user/dashboard', { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get('http://localhost:5000/user/lots',      { headers: { Authorization: `Bearer ${token}` } })
         ])
         this.user = userRes.data
         this.lots = lotsRes.data
@@ -173,26 +173,31 @@ export default {
       }
     },
     async openBookingModal(lot) {
-      const token = localStorage.getItem('token')
-      try {
-        const res = await axios.post(
-          'http://localhost:5000/user/assign',
-          { lot_id: lot.id },
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
-        this.bookingData = {
-          lotId: lot.id,
-          lotName: lot.name,
-          spotNumber: res.data.spot_number,
-          reservationId: res.data.reservation_id,
-          cost: res.data.cost
-        }
-        this.vehicleNumber = ''
-        this.showModal = true
-      } catch (err) {
-        alert(err.response?.data?.msg || 'Could not hold a spot.')
-      }
-    },
+  const token = localStorage.getItem('token');
+  try {
+    const res = await axios.post(
+      'http://localhost:5000/user/assign',
+      { lot_id: lot.id },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    
+    // Set start time to current IST time
+    const nowIST = DateTime.now().setZone('Asia/Kolkata').toISO();
+    
+    this.bookingData = {
+      lotId: lot.id,
+      lotName: lot.name,
+      spotNumber: res.data.spot_number,
+      reservationId: res.data.reservation_id,
+      cost: res.data.cost,
+      startTime: nowIST // Use current IST time
+    };
+    this.vehicleNumber = '';
+    this.showModal = true;
+  } catch {
+    alert('Could not hold a spot.');
+  }
+},
     async confirmBooking() {
       const token = localStorage.getItem('token')
       try {
@@ -206,19 +211,29 @@ export default {
         )
         this.showModal = false
         this.$router.push('/user/reservations')
-      } catch (err) {
-        alert(err.response?.data?.msg || 'Booking failed.')
+      } catch {
+        alert('Booking failed.')
       }
     },
     closeModal() {
       this.showModal = false
-    }
+    },
+     formatDateIST(dateStr) {
+      if (!dateStr) return 'N/A';
+      // Parse with explicit India timezone
+      const ist = DateTime.fromISO(dateStr).setZone('Asia/Kolkata');
+      return ist.isValid 
+        ? ist.toFormat("dd LLL yyyy, hh:mm a 'IST'") 
+        : 'Invalid Date';
+    },
+
   },
   mounted() {
     this.fetchData()
   }
 }
 </script>
+
 
 <style scoped>
 .loader-container {
@@ -247,82 +262,109 @@ export default {
   background-color: #f9f9f9;
 }
 
-.search-row .form-select,
+/* Make the search row stretch */
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+/* Ensure the input fills the remaining space */
 .search-row .form-control {
-  max-width: 100%;
+  flex: 1 1 auto;
+  width: 100%;
+  border: 1px solid #000;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+/* Give the dropdown a solid black border on all sides */
+.styled-dropdown {
+  flex: 0 0 auto;
+  border: 1px solid #000 !important;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1.5rem 0.5rem 0.75rem;
+  background-color: #fff;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 140 140' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%23000' d='M0 20l70 100 70-100z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 0.65rem;
+  box-sizing: border-box;
+}
+
+/* Keep the black border on focus/open */
+.styled-dropdown:focus {
+  outline: none;
+  border-color: #000 !important;
+  box-shadow: 0 0 0 1px #000;
 }
 
 .card {
-  transition: box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
 }
 
 .card:hover {
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-4px) scale(1.015);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
 }
 
 .card-title {
   font-weight: 600;
 }
 
-/* ========== CUSTOM MODAL ========== */
-.custom-modal {
+.booking-modal {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   z-index: 2000;
-  background-color: rgba(0, 0, 0, 0.6); /* Backdrop */
+  background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
 }
 
-.custom-modal .modal-dialog {
+.booking-modal .modal-dialog {
   max-width: 500px;
   width: 100%;
-  margin: 0 !important;
 }
 
-.custom-modal .modal-content {
+.booking-modal .modal-content {
+  border: none;
   background-color: #fff;
-  border-radius: 0.75rem;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
-  border: none;
-  width: 100%;
-  padding: 0;
-  opacity: 1;
-  animation: fadeIn 0.2s ease-in-out;
+  animation: fadeIn 0.25s ease-out;
 }
 
-.custom-modal .modal-header,
-.custom-modal .modal-body,
-.custom-modal .modal-footer {
-  padding: 1rem;
-  margin: 0;
-  border: none;
+.booking-modal .modal-header {
+  border-bottom: none;
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
 }
 
-.custom-modal .modal-header {
-  background-color: #0d6efd;
-  color: white;
-  border-top-left-radius: 0.75rem;
-  border-top-right-radius: 0.75rem;
+.booking-modal .modal-footer {
+  border-top: none;
+  border-bottom-left-radius: 1rem;
+  border-bottom-right-radius: 1rem;
 }
 
-.custom-modal .modal-footer {
-  background-color: #f8f9fa;
-  border-bottom-left-radius: 0.75rem;
-  border-bottom-right-radius: 0.75rem;
+.booking-modal input.form-control {
+  border-radius: 0.5rem;
+  font-size: 1rem;
+}
+
+.booking-modal .btn {
+  border-radius: 0.5rem;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.96);
   }
+
   to {
     opacity: 1;
     transform: scale(1);

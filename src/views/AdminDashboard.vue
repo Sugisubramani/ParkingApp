@@ -78,9 +78,12 @@
       <div v-if="currentView === 'home'" class="p-4">
 
         <!-- 1) Add Lot Button -->
-        <button class="btn btn-primary mb-4" @click="showNewLotModal = true">
-          + Add Lot
-        </button>
+<div class="d-flex justify-content-center mb-4">
+  <button class="btn btn-primary" @click="showNewLotModal = true">
+    + Add Lot
+  </button>
+</div>
+
         <!-- Search Bar -->
         <div class="d-flex align-items-center mb-3">
           <!-- Dropdown for search-by field -->
@@ -287,9 +290,10 @@
           <template v-if="selectedSpot.is_available">
             <p>Status: Available</p>
             <div class="text-end">
-              <button class="btn btn-danger me-2" @click="deleteSpot(selectedSpot.id)">
+              <button class="btn btn-danger me-2" @click="deleteSpot(selectedLot.id, selectedSpot.id)">
                 Delete Spot
               </button>
+
               <button class="btn btn-secondary" @click="showSpotModal = false">
                 Close
               </button>
@@ -447,6 +451,30 @@ export default {
       });
     },
 
+    async deleteSpot(lotId, spotId) {
+  try {
+    // 1. Optimistically remove from UI
+    const lot = this.parkingLots.find(l => l.id === lotId);
+    if (lot) {
+      lot.spots = lot.spots.filter(s => s.id !== spotId);
+    }
+
+    // 2. Close modal IMMEDIATELY (before API call)
+    this.showSpotModal = false;  // This is the key line you're missing
+
+    // 3. Make API call in background
+    const token = localStorage.getItem('token');
+    await axios.delete(
+      `http://localhost:5000/admin/lots/${lotId}/spots/${spotId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+  } catch (err) {
+    // If error occurs, refresh data
+    this.fetchLots();
+    console.error('Delete failed:', err);
+  }
+},
     clearSearch() {
       this.searchQuery = '';
       this.parkingLots = this.allParkingLots;
@@ -479,48 +507,6 @@ export default {
       }
     },
 
-    async deleteLot(lotId) {
-      // 1) Confirm in the UI
-      if (!confirm('Delete this empty lot for good?')) return;
-
-      // 2) Grab token
-      const token = localStorage.getItem('token');
-      if (!token) {
-        return alert('Not authenticated');
-      }
-
-      try {
-        // 3) Call DELETE endpoint
-        const res = await fetch(
-          `http://127.0.0.1:5000/admin/lots/${lotId}`,
-          {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            }
-          }
-        );
-
-        // 4) Read back the payload
-        const data = await res.json();
-        console.log('DELETE /admin/lots response →', res.status, data);
-
-        // 5) Handle errors
-        if (!res.ok) {
-          // show server’s message
-          return alert(data.msg || `Delete failed (${res.status})`);
-        }
-
-        // 6) Success—refresh your list
-        alert('Lot deleted successfully');
-        this.fetchLots();
-      }
-      catch (err) {
-        console.error('Network or parsing error:', err);
-        alert('Unexpected error, check console for details');
-      }
-    },
 
 
 
@@ -709,22 +695,46 @@ export default {
     },
 
     async deleteLot(lotId) {
-      const token = localStorage.getItem('token')
-      try {
-        const res = await fetch(
-          `http://localhost:5000/admin/lots/${lotId}`,
-          {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        )
-        const data = await res.json()
-        if (!res.ok) return alert(data.msg)
-        this.fetchLots()
-      } catch {
-        alert('Error deleting lot')
+  // 1) Confirm in the UI
+  if (!confirm('Delete this empty lot for good?')) return;
+
+  // 2) Grab token
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return alert('Not authenticated');
+  }
+
+  try {
+    // 3) Call DELETE endpoint
+    const res = await fetch(
+      `http://127.0.0.1:5000/admin/lots/${lotId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
       }
-    },
+    );
+
+    // 4) Read back the payload
+    const data = await res.json();
+    console.log('DELETE /admin/lots response →', res.status, data);
+
+    // 5) Handle errors
+    if (!res.ok) {
+      return alert(data.msg || `Delete failed (${res.status})`);
+    }
+
+    // 6) Success—refresh your list
+    alert('Lot deleted successfully');
+    this.fetchLots();
+  }
+  catch (err) {
+    console.error('Network or parsing error:', err);
+    alert('Unexpected error, check console for details');
+  }
+},
 
 
     promptEditSpot(lotId, spotId, currentNumber) {
@@ -918,4 +928,126 @@ export default {
   font-weight: bold;
   border-radius: 4px;
 }
+
+/* Layout Tweaks */
+.main-content {
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+}
+
+/* Profile Card */
+.profile-card {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 12px;
+  background-color: #ffffff;
+}
+
+/* Password toggle eye icon */
+.password-eye {
+  position: absolute;
+  top: 75%;
+  right: 12px;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #6c757d;
+}
+
+/* Stat Box */
+.stat-box {
+  transition: box-shadow 0.3s ease;
+  border-radius: 12px;
+}
+.stat-box:hover {
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.1);
+}
+.stat-title {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: bold;
+}
+
+/* Charts */
+.chart-container {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+  padding: 1rem;
+}
+
+.modal-content {
+  width: 100%;
+  max-width: 500px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.25s ease-in-out;
+}
+
+/* Lot Cards */
+.lot-card {
+  border-radius: 8px;
+  transition: transform 0.2s ease;
+}
+.lot-card:hover {
+  transform: scale(1.01);
+}
+
+/* Spot Boxes */
+.spot-box {
+  width: 48px;
+  height: 48px;
+  font-weight: 600;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.spot-box:hover {
+  transform: scale(1.1);
+}
+
+/* Table */
+.table th,
+.table td {
+  vertical-align: middle;
+}
+
+/* Button enhancements */
+.btn {
+  border-radius: 6px;
+}
+
+/* Responsive padding fix for smaller screens */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 1rem;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+
 </style>
