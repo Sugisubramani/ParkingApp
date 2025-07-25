@@ -15,9 +15,11 @@
       <section v-else>
         <h2 class="section-title">Your Reservations</h2>
 
-        <div v-if="user.reservations?.length" class="cards-grid">
+        <!-- Active Reservations -->
+        <h4 class="sub-title">Active Reservations</h4>
+        <div v-if="activeReservations.length" class="cards-grid">
           <div
-            v-for="r in user.reservations"
+            v-for="r in activeReservations"
             :key="r.reservation_id"
             class="reservation-card"
           >
@@ -26,10 +28,7 @@
                 <h5 class="lot-name">{{ r.lot_name }}</h5>
                 <small class="lot-address">{{ r.lot_address }}</small>
               </div>
-              <button
-                class="btn btn-sm btn-warning"
-                @click="releaseSpot(r.reservation_id)"
-              >
+              <button class="btn btn-sm btn-warning" @click="releaseSpot(r.reservation_id)">
                 Release
               </button>
             </div>
@@ -44,9 +43,36 @@
             </div>
           </div>
         </div>
-
         <p v-else class="no-reservations">
           You have no active reservations.
+        </p>
+
+        <!-- Parked Out Reservations -->
+        <h4 class="sub-title mt-4">Parked Out</h4>
+        <div v-if="parkedOutReservations.length" class="cards-grid">
+          <div
+            v-for="r in parkedOutReservations"
+            :key="r.reservation_id"
+            class="reservation-card parked-out"
+          >
+            <div class="card-header">
+              <div class="header-text">
+                <h5 class="lot-name">{{ r.lot_name }}</h5>
+                <small class="lot-address">{{ r.lot_address }}</small>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="info"><strong>Spot:</strong> #{{ r.spot_number }}</div>
+              <div class="info"><strong>Vehicle:</strong> {{ r.vehicle_number }}</div>
+              <div class="info"><strong>Start:</strong> {{ formatDate(r.start_time) }}</div>
+              <div class="info">
+                <strong>End:</strong> {{ formatDate(r.end_time) }}
+              </div>
+            </div>
+          </div>
+        </div>
+        <p v-else class="no-reservations">
+          You have no past reservations.
         </p>
       </section>
     </div>
@@ -56,7 +82,7 @@
       class="modal fade"
       tabindex="-1"
       :class="{ show: showReleaseModal }"
-      style="display: block;"
+      :style="{ display: showReleaseModal ? 'block' : 'none' }"
       v-if="showReleaseModal"
     >
       <div class="modal-dialog">
@@ -129,6 +155,12 @@ export default {
       const end = new Date()
       const hours = Math.ceil((end - start) / (1000 * 60 * 60)) || 1
       return hours * 20 // ₹20/hour
+    },
+    activeReservations() {
+      return this.user?.reservations?.filter(r => !r.end_time) || []
+    },
+    parkedOutReservations() {
+      return this.user?.reservations?.filter(r => r.end_time) || []
     }
   },
   methods: {
@@ -198,12 +230,42 @@ export default {
   padding: 1.5rem 2rem;
 }
 
+/* Main Title with gradient underline */
 .section-title {
+  position: relative;
   font-size: 1.75rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--primary);
   text-align: center;
   margin-bottom: 1.5rem;
+}
+.section-title::after {
+  content: '';
+  display: block;
+  width: 60px;
+  height: 4px;
+  margin: 8px auto 0;
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+  border-radius: 2px;
+}
+
+/* Sub-title with left accent bar */
+.sub-title {
+  position: relative;
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  padding-left: 12px;
+  color: var(--text);
+}
+.sub-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 4px;
+  height: calc(100% - 8px);
+  background: var(--primary);
+  border-radius: 2px;
 }
 
 /* Loader */
@@ -228,28 +290,35 @@ export default {
 /* Individual reservation card */
 .reservation-card {
   background: #fff;
+  border-left: 4px solid var(--primary);
   border-radius: 0.5rem;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .reservation-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+}
+/* Muted accent for parked-out */
+.reservation-card.parked-out {
+  border-left-color: var(--secondary);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #f8f9fa;
+  background: rgba(0, 0, 0, 0.03);
   padding: 1rem;
   border-bottom: 1px solid #e9ecef;
 }
+
 .header-text h5 {
   margin: 0;
   font-size: 1.125rem;
 }
+
 .header-text small {
   color: #6c757d;
 }
@@ -257,6 +326,7 @@ export default {
 .card-body {
   padding: 1rem;
 }
+
 .info {
   margin-bottom: 0.5rem;
   font-size: 0.95rem;

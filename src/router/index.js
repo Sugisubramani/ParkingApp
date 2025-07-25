@@ -29,6 +29,13 @@ const routes = [
   },
 
   {
+    path: '/user/profile',
+    name: 'UserProfile',
+    component: () => import('../views/UserProfile.vue'),
+    meta: { requiresAuth: true }
+  },
+
+  {
     path: '/user/summary',
     name: 'UserSummary',
     component: UserSummary,
@@ -54,7 +61,7 @@ const router = createRouter({
 // Global auth guard
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
-  const role  = localStorage.getItem('role')
+  const role = localStorage.getItem('role')
 
   if (to.meta.requiresAuth) {
     if (!token) {

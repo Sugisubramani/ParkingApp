@@ -3,7 +3,6 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
 db = SQLAlchemy()
-
 class User(db.Model):
     __tablename__ = 'users'
 
@@ -18,8 +17,6 @@ class User(db.Model):
     # A user can create many lots, and make many reservations
     created_lots  = db.relationship('ParkingLot',   backref='creator', lazy=True)
     reservations  = db.relationship('Reservation',   backref='user',    lazy=True)
-
-
 class ParkingLot(db.Model):
     __tablename__ = 'parking_lot'
 
@@ -29,8 +26,6 @@ class ParkingLot(db.Model):
     pincode        = db.Column(db.String(20),               nullable=False)
     price_per_hour = db.Column(db.Float,                    nullable=False)
     created_by     = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-
-    # A lot has many spots and many reservations
     spots         = db.relationship(
         'ParkingSpot',
         backref='lot',
@@ -38,8 +33,6 @@ class ParkingLot(db.Model):
         lazy=True
     )
     reservations  = db.relationship('Reservation', backref='lot', lazy=True)
-
-
 class ParkingSpot(db.Model):
     __tablename__ = 'parking_spot'
 
@@ -49,8 +42,6 @@ class ParkingSpot(db.Model):
     is_reserved  = db.Column(db.Boolean, default=False)
 
     reservations = db.relationship('Reservation', backref='spot', lazy=True)
-
-
 class Reservation(db.Model):
     __tablename__ = 'reservation'
     id            = db.Column(db.Integer, primary_key=True)
@@ -59,7 +50,4 @@ class Reservation(db.Model):
     spot_id       = db.Column(db.Integer, db.ForeignKey('parking_spot.id'), nullable=False)
     start_time    = db.Column(db.DateTime, default=datetime.utcnow)
     end_time      = db.Column(db.DateTime, nullable=True)
-
-    # ← Add this line:
     vehicle_number = db.Column(db.String(50), nullable=False)
-

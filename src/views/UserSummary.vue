@@ -17,22 +17,31 @@
     <div class="scroll-area">
       <h2 class="section-title mb-4">Monthly Summary</h2>
 
-      <!-- wrap summary + chart side by side -->
-      <div class="summary-chart-wrapper">
-        <!-- Summary Card -->
-        <div class="card shadow-sm p-4 summary-card">
-          <p class="mb-2"><strong>Total Reservations:</strong> {{ totalReservations }}</p>
-          <p class="mb-2"><strong>Total Hours Parked:</strong> {{ totalHours.toFixed(1) }}</p>
-          <p class="mb-2"><strong>Total Amount Spent:</strong> ₹{{ totalCost.toFixed(2) }}</p>
-          <p class="mb-0"><strong>Most Frequent Lot:</strong> {{ frequentLot || 'N/A' }}</p>
+      <!-- metrics at top, side by side -->
+      <div class="metrics-container">
+        <div class="metric-box">
+          <p class="metric-value">{{ totalReservations }}</p>
+          <p class="metric-label">Total Reservations</p>
         </div>
+        <div class="metric-box">
+          <p class="metric-value">{{ totalHours.toFixed(1) }}</p>
+          <p class="metric-label">Total Hours Parked</p>
+        </div>
+        <div class="metric-box">
+          <p class="metric-value">₹{{ totalCost.toFixed(2) }}</p>
+          <p class="metric-label">Total Amount Spent</p>
+        </div>
+        <div class="metric-box">
+          <p class="metric-value">{{ frequentLot || 'N/A' }}</p>
+          <p class="metric-label">Most Frequent Lot</p>
+        </div>
+      </div>
 
-        <!-- Bar Chart -->
-        <div class="card shadow-sm p-4 chart-card">
-          <h5 class="card-title mb-3">Times Parked by Lot</h5>
-          <div class="chart-container">
-            <canvas ref="timesChart"></canvas>
-          </div>
+      <!-- chart below -->
+      <div class="chart-card">
+        <h5 class="chart-title">Times Parked by Lot</h5>
+        <div class="chart-container">
+          <canvas ref="timesChart"></canvas>
         </div>
       </div>
     </div>
@@ -72,7 +81,7 @@ export default {
     },
     totalHours() {
       const mins = this.dataByLot.reduce((sum, l) => sum + (l.total_time_minutes||0), 0)
-      return mins/60
+      return mins / 60
     },
     totalCost() {
       return this.dataByLot.reduce((sum, l) => sum + (l.total_cost||0), 0)
@@ -81,7 +90,7 @@ export default {
       if (!this.dataByLot.length) return ''
       return this.dataByLot
         .slice()
-        .sort((a,b) => (b.times_parked||0)-(a.times_parked||0))[0]
+        .sort((a,b) => (b.times_parked||0) - (a.times_parked||0))[0]
         .lot_name
     }
   },
@@ -109,12 +118,24 @@ export default {
 
       this.chart = new Chart(ctx, {
         type: 'bar',
-        data: { labels, datasets:[{ label:'Times Parked', data, backgroundColor:'#0d6efd' }] },
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: '#0d6efd'
+          }]
+        },
         options: {
           animation: false,
           responsive: true,
           maintainAspectRatio: false,
-          scales: { y:{ beginAtZero:true, ticks:{ precision:0 } } }
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 }
+            }
+          },
+          plugins: { legend: { display: false } }
         }
       })
     }
@@ -130,10 +151,10 @@ export default {
     try {
       const [sumRes, userRes] = await Promise.all([
         axios.get('http://localhost:5000/user/summary', {
-          headers:{ Authorization:`Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get('http://localhost:5000/user/dashboard', {
-          headers:{ Authorization:`Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` }
         })
       ])
 
@@ -142,11 +163,12 @@ export default {
         : Array.isArray(sumRes.data)
           ? sumRes.data
           : []
+
       this.user = userRes.data
 
       if (this.dataByLot.length) this.$nextTick(this.renderChart)
     }
-    catch(err) {
+    catch (err) {
       console.error(err)
       if (err.response?.status === 401) {
         localStorage.clear()
@@ -171,8 +193,10 @@ export default {
 .scroll-area {
   flex: 1;
   overflow-y: auto;
-  padding: 2rem 1rem;
+  padding: 2rem 1.5rem;
 }
+
+/* Loader */
 .loader-container {
   text-align: center;
   margin-top: 4rem;
@@ -182,41 +206,65 @@ export default {
   font-size: .95rem;
   color: #666;
 }
+
+/* Section Title */
 .section-title {
-  text-align: center;
-  color: #0d6efd;
+  color: #000;
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: left;
   margin-bottom: 1.5rem;
 }
 
-/* new wrapper to align summary + chart */
-.summary-chart-wrapper {
-  display: flex;
+/* metrics row */
+.metrics-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1rem;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}   
-
-/* summary takes 30% width */
-.summary-card {
-  flex: 0 0 30%;
-  min-width: 250px;
+  margin-bottom: 2rem;
+}
+.metric-box {
   background: #fff;
   border-radius: .5rem;
-  box-shadow: 0 2px 6px rgba(0,0,0,.1);
-  padding: 1.25rem;
+  border-left: 6px solid #0d6efd;
+  padding: 1rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  text-align: center;
+}
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+}
+.metric-label {
+  font-size: .9rem;
+  color: #555;
+  margin: .25rem 0 0;
 }
 
-/* chart takes remaining width */
+/* Chart Card */
 .chart-card {
-  flex: 1;
   background: #fff;
   border-radius: .5rem;
-  box-shadow: 0 2px 6px rgba(0,0,0,.1);
-  padding: 1.25rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
 }
-
+.chart-title {
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #333;
+}
 .chart-container {
   position: relative;
   height: 300px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .section-title {
+    text-align: center;
+  }
 }
 </style>

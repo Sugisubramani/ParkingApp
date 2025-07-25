@@ -764,6 +764,54 @@ def api_confirm_reservation():
     db.session.commit()
     return jsonify(message='Booking confirmed'), 200
 
+@app.route('/user/profile', methods=['GET'])
+@jwt_required()
+def user_get_profile():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify(msg="User not found"), 404
+
+    return jsonify({
+        'fullname': user.fullname,
+        'email':    user.email,
+        'address':  user.address,
+        'pincode':  user.pincode,
+        'role':     user.role
+    }), 200
+
+@app.route('/user/profile', methods=['PUT'])
+@jwt_required()
+def user_update_profile():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify(msg="User not found"), 404
+
+    data = request.get_json() or {}
+    # Only allow these fields
+    fullname = data.get('fullname', '').strip()
+    email    = data.get('email', '').strip()
+    address  = data.get('address', '').strip()
+    pincode  = data.get('pincode', '').strip()
+
+    # Basic validation
+    if not all([fullname, email, address, pincode]):
+        return jsonify(msg="All fields are required"), 400
+
+    # (Optional) check email uniqueness
+    other = User.query.filter(User.email == email, User.id != user_id).first()
+    if other:
+        return jsonify(msg="Email already in use"), 409
+
+    # Apply updates
+    user.fullname = fullname
+    user.email    = email
+    user.address  = address
+    user.pincode  = pincode
+    db.session.commit()
+
+    return jsonify(msg="Profile updated successfully"), 200
 
 
 if __name__ == '__main__':
