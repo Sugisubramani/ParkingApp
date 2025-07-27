@@ -18,13 +18,20 @@
         <!-- Active Reservations -->
         <h4 class="sub-title">Active Reservations</h4>
         <div v-if="activeReservations.length" class="cards-grid">
-          <div v-for="r in activeReservations" :key="r.reservation_id" class="reservation-card">
+          <div
+            v-for="r in activeReservations"
+            :key="r.reservation_id"
+            class="reservation-card"
+          >
             <div class="card-header">
               <div class="header-text">
                 <h5 class="lot-name">{{ r.lot_name }}</h5>
                 <small class="lot-address">{{ r.lot_address }}</small>
               </div>
-              <button class="btn btn-sm btn-warning" @click="releaseSpot(r.reservation_id)">
+              <button
+                class="btn btn-sm btn-warning"
+                @click="releaseSpot(r.reservation_id)"
+              >
                 Release
               </button>
             </div>
@@ -46,7 +53,11 @@
         <!-- Parked Out Reservations -->
         <h4 class="sub-title mt-4">Parked Out</h4>
         <div v-if="parkedOutReservations.length" class="cards-grid">
-          <div v-for="r in parkedOutReservations" :key="r.reservation_id" class="reservation-card parked-out">
+          <div
+            v-for="r in parkedOutReservations"
+            :key="r.reservation_id"
+            class="reservation-card parked-out"
+          >
             <div class="card-header">
               <div class="header-text">
                 <h5 class="lot-name">{{ r.lot_name }}</h5>
@@ -57,9 +68,7 @@
               <div class="info"><strong>Spot:</strong> #{{ r.spot_number }}</div>
               <div class="info"><strong>Vehicle:</strong> {{ r.vehicle_number }}</div>
               <div class="info"><strong>Start:</strong> {{ formatDateIST(r.start_time) }}</div>
-              <div class="info">
-                <strong>End:</strong> {{ formatDateIST(r.end_time) }}
-              </div>
+              <div class="info"><strong>End:</strong> {{ formatDateIST(r.end_time) }}</div>
             </div>
           </div>
         </div>
@@ -70,46 +79,82 @@
     </div>
 
     <!-- Release Modal -->
-    <div class="release-modal" v-if="showReleaseModal" @click.self="showReleaseModal = false">
+    <div
+      class="release-modal"
+      v-if="showReleaseModal"
+      @click.self="showReleaseModal = false"
+    >
       <div class="modal-dialog">
         <div class="modal-content shadow rounded-4">
           <div class="modal-header bg-dark text-white px-4 py-3">
             <h5 class="modal-title fw-semibold">Release Reservation</h5>
-            <button type="button" class="btn-close btn-close-white" @click="showReleaseModal = false"></button>
+            <button
+              type="button"
+              class="btn-close btn-close-white"
+              @click="showReleaseModal = false"
+            ></button>
           </div>
 
           <div class="modal-body px-4 py-3">
             <div class="mb-3">
-              <div class="d-flex justify-content-between align-items-center mb-2">
+              <div
+                class="d-flex justify-content-between align-items-center mb-2"
+              >
                 <span class="text-muted">Parking Lot</span>
                 <strong>{{ activeReservation.lot_name }}</strong>
               </div>
-              <div class="d-flex justify-content-between align-items-center mb-2">
+              <div
+                class="d-flex justify-content-between align-items-center mb-2"
+              >
                 <span class="text-muted">Spot Number</span>
                 <strong>#{{ activeReservation.spot_number }}</strong>
               </div>
-              <div class="d-flex justify-content-between align-items-center mb-2">
+              <div
+                class="d-flex justify-content-between align-items-center mb-2"
+              >
                 <span class="text-muted">Vehicle Number</span>
                 <strong>{{ activeReservation.vehicle_number }}</strong>
               </div>
-              <div class="d-flex justify-content-between align-items-center mb-2">
+              <div
+                class="d-flex justify-content-between align-items-center mb-2"
+              >
                 <span class="text-muted">Start Time</span>
                 <strong>{{ formatDateIST(activeReservation.start_time) }}</strong>
               </div>
-              <div class="d-flex justify-content-between align-items-center mb-2">
+              <div
+                class="d-flex justify-content-between align-items-center mb-2"
+              >
                 <span class="text-muted">Release Time</span>
                 <strong>{{ currentIST }}</strong>
               </div>
-              <div class="d-flex justify-content-between align-items-center mb-0">
+              <div
+                class="d-flex justify-content-between align-items-center mb-0"
+              >
                 <span class="text-muted">Estimated Cost</span>
-                <strong class="text-success">₹{{ estimatedCost }}</strong>
+                <strong class="text-success">
+                  {{ formattedCost }}
+                  <small v-if="releaseResult.cost !== null">(actual)</small>
+                  <small v-else>(est.)</small>
+                </strong>
               </div>
             </div>
           </div>
 
-          <div class="modal-footer bg-light px-4 py-3 d-flex justify-content-between">
-            <button class="btn btn-outline-dark" @click="showReleaseModal = false">Cancel</button>
-            <button class="btn btn-warning px-4" @click="confirmRelease">Release</button>
+          <div
+            class="modal-footer bg-light px-4 py-3 d-flex justify-content-between"
+          >
+            <button
+              class="btn btn-outline-dark"
+              @click="showReleaseModal = false"
+            >
+              Cancel
+            </button>
+            <button
+              class="btn btn-warning px-4"
+              @click="confirmRelease"
+            >
+              Release
+            </button>
           </div>
         </div>
       </div>
@@ -133,22 +178,44 @@ export default {
       loading: true,
       error: '',
       showReleaseModal: false,
-      activeReservation: null
+      activeReservation: null,
+      releaseResult: {
+        cost: null,
+        duration: null
+      }
     }
   },
 
   computed: {
     currentIST() {
-      return DateTime.now().setZone('Asia/Kolkata').toFormat("M/d/yyyy, h:mm a")
+      return DateTime.now()
+        .setZone('Asia/Kolkata')
+        .toFormat('M/d/yyyy, h:mm a')
     },
 
-    estimatedCost() {
+    // Raw estimate: at least 1 hour × price_per_hour
+    estimatedCostRaw() {
       if (!this.activeReservation) return 0
-      
-      const start = DateTime.fromISO(this.activeReservation.start_time, { zone: 'utc' })
-      const end = DateTime.now()
-      const hours = Math.ceil(end.diff(start, 'hours').hours) || 1
-      return hours * 20 // ₹20/hour
+      const startUTC = DateTime.fromISO(this.activeReservation.start_time, {
+        zone: 'utc'
+      })
+      const nowUTC = DateTime.now().toUTC()
+      const diffHours = nowUTC.diff(startUTC, 'hours').hours
+      const billedHrs = Math.ceil(diffHours)
+      return billedHrs * this.activeReservation.price_per_hour
+    },
+
+    // Display actual cost if available, else estimate, formatted as ₹
+    formattedCost() {
+      const raw = this.releaseResult.cost != null
+        ? this.releaseResult.cost
+        : this.estimatedCostRaw
+
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 0
+      }).format(raw)
     },
 
     activeReservations() {
@@ -164,9 +231,16 @@ export default {
     async fetchReservations() {
       this.loading = true
       try {
-        const res = await axios.get('http://localhost:5000/user/dashboard', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        })
+        const res = await axios.get(
+          'http://localhost:5000/user/dashboard',
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem(
+                'token'
+              )}`
+            }
+          }
+        )
         this.user = res.data
       } catch (err) {
         console.error(err)
@@ -184,35 +258,49 @@ export default {
 
     formatDateIST(dateStr) {
       if (!dateStr) return 'Ongoing'
-      // Parse as UTC and convert to IST
       return DateTime.fromISO(dateStr, { zone: 'utc' })
         .setZone('Asia/Kolkata')
-        .toFormat("M/d/yyyy, h:mm a")
+        .toFormat('M/d/yyyy, h:mm a')
     },
 
     releaseSpot(reservationId) {
-      const reservation = this.user.reservations.find(r => r.reservation_id === reservationId)
+      const reservation = this.user.reservations.find(
+        r => r.reservation_id === reservationId
+      )
       if (reservation) {
-        this.activeReservation = { ...reservation }
+        this.activeReservation = {
+          ...reservation,
+          price_per_hour: reservation.price_per_hour || 0
+        }
+        this.releaseResult = { cost: null, duration: null }
         this.showReleaseModal = true
       }
     },
 
     async confirmRelease() {
       try {
-        // Send UTC time to backend
         const endTimeUTC = DateTime.now().toUTC().toISO()
-        
-        await axios.post(
+        const res = await axios.post(
           'http://localhost:5000/user/release',
-          { 
+          {
             reservation_id: this.activeReservation.reservation_id,
             end_time: endTimeUTC
           },
-          { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem(
+                'token'
+              )}`
+            }
+          }
         )
+
+        this.releaseResult.cost = res.data.cost
+        this.releaseResult.duration = res.data.duration
+
+        // Optionally keep modal open to show actual cost, or close and refresh
         this.showReleaseModal = false
-        this.fetchReservations()
+        await this.fetchReservations()
       } catch (err) {
         console.error(err)
         alert(err.response?.data?.msg || 'Failed to release spot.')
@@ -225,6 +313,8 @@ export default {
   }
 }
 </script>
+
+
 
 <style scoped>
 .dashboard-wrapper {

@@ -1,15 +1,17 @@
 <template>
-  <nav class="navbar bg-white shadow-sm px-4 py-2 position-relative d-flex align-items-center">
-    <!-- Brand -->
-    <router-link
-      :to="dashboardRoute"
-      class="navbar-brand d-flex align-items-center mb-0 text-dark text-decoration-none"
-    >
-      <img src="/images/parkwisee.png" alt="Parkwise Logo" class="logo-img" />
-    </router-link>
+  <nav class="navbar bg-white shadow-sm px-4 py-2 position-relative">
+    <!-- Brand (Left) -->
+    <div class="d-flex align-items-center">
+      <router-link
+        :to="dashboardRoute"
+        class="navbar-brand d-flex align-items-center mb-0 text-dark text-decoration-none"
+      >
+        <img src="/images/parkwisee.png" alt="Parkwise Logo" class="logo-img" />
+      </router-link>
+    </div>
 
-    <!-- Navigation Links (Absolutely Centered) -->
-    <div class="nav-links d-flex gap-4 position-absolute top-50 start-50 translate-middle">
+    <!-- Nav Links (Perfectly Centered) -->
+    <div class="position-absolute top-50 start-50 translate-middle d-flex gap-4">
       <router-link to="/user/dashboard" class="nav-link text-dark fw-semibold">
         Home
       </router-link>
@@ -21,31 +23,33 @@
       </router-link>
     </div>
 
-    <!-- User Dropdown (Pushed Right) -->
-    <div class="dropdown ms-auto" v-if="username">
-      <button
-        class="btn btn-light dropdown-toggle d-flex align-items-center"
-        type="button"
-        id="userMenu"
-        data-bs-toggle="dropdown"
-        aria-expanded="false"
-      >
-        <i class="bi bi-person-circle me-2 fs-5"></i>
-        <span class="fw-semibold">{{ username }}</span>
-      </button>
-      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-        <li>
-          <router-link to="/user/profile" class="dropdown-item">
-            Profile
-          </router-link>
-        </li>
-        <li><hr class="dropdown-divider" /></li>
-        <li>
-          <a class="dropdown-item" href="#" @click.prevent="logout">
-            Logout
-          </a>
-        </li>
-      </ul>
+    <!-- User Dropdown (Right-aligned) -->
+    <div class="ms-auto d-flex align-items-center" v-if="username">
+      <div class="dropdown">
+        <button
+          class="btn btn-light dropdown-toggle d-flex align-items-center"
+          type="button"
+          id="userMenu"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+        >
+          <i class="bi bi-person-circle me-2 fs-5"></i>
+          <span class="fw-semibold">{{ username }}</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+          <li>
+            <router-link to="/user/profile" class="dropdown-item">
+              Profile
+            </router-link>
+          </li>
+          <li><hr class="dropdown-divider" /></li>
+          <li>
+            <a class="dropdown-item" href="#" @click.prevent="logout">
+              Logout
+            </a>
+          </li>
+        </ul>
+      </div>
     </div>
   </nav>
 </template>
@@ -72,7 +76,6 @@ export default {
 <style scoped>
 .logo-img {
   height: 32px;
-  width: auto;
   object-fit: contain;
   display: block;
 }
@@ -88,8 +91,25 @@ export default {
   text-decoration: none;
 }
 
-/* Optional: ensure nav-links don't wrap or overflow */
-.nav-links {
-  white-space: nowrap;
+.navbar {
+  min-height: 56px;
+}
+
+.dropdown-menu {
+  font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .navbar {
+    flex-wrap: wrap;
+  }
+
+  .nav-links {
+    position: static !important;
+    transform: none !important;
+    margin-top: 0.5rem;
+    justify-content: center;
+    width: 100%;
+  }
 }
 </style>

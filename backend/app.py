@@ -12,6 +12,7 @@ from models import db, User, ParkingLot, ParkingSpot, Reservation
 from flask import request
 import math
 from sqlalchemy import func
+from math import ceil
 import traceback
 
 
@@ -412,7 +413,7 @@ def user_dashboard():
             "vehicle_number":  res.vehicle_number,                # ✅ fixed
             "start_time":      res.start_time.isoformat(),
             "end_time":        res.end_time.isoformat() if res.end_time else None,
-            "cost":            getattr(res, 'cost', 0)
+            "price_per_hour":  lot.price_per_hour if lot else 0
         })
 
     return jsonify({
@@ -423,51 +424,59 @@ def user_dashboard():
     }), 200
 
 
+from flask import jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy import func, cast, Integer
+from datetime import datetime
+
 @app.route('/user/summary', methods=['GET'])
 @jwt_required()
 def user_summary():
     user_id = get_jwt_identity()
 
-    # 1) Define start of current month
+    # Start of current month (UTC)
     now = datetime.utcnow()
     month_start = datetime(now.year, now.month, 1)
 
-    # 2) Query and group by lot
+    # Aggregate per lot: visits, total time, and cost
     results = (
         db.session.query(
             ParkingLot.name.label('lot_name'),
             func.count(Reservation.id).label('times_parked'),
             func.sum(
-                func.strftime('%s', Reservation.end_time) -
-                func.strftime('%s', Reservation.start_time)
+                cast(func.strftime('%s', Reservation.end_time), Integer)
+                - cast(func.strftime('%s', Reservation.start_time), Integer)
             ).label('total_time_secs'),
             func.sum(
-                (func.strftime('%s', Reservation.end_time) -
-                 func.strftime('%s', Reservation.start_time)) /
-                3600.0 * ParkingLot.price_per_hour
+                (
+                    cast(func.strftime('%s', Reservation.end_time), Integer)
+                    - cast(func.strftime('%s', Reservation.start_time), Integer)
+                ) / 3600.0
+                * ParkingLot.price_per_hour
             ).label('total_cost')
         )
         .join(Reservation, Reservation.lot_id == ParkingLot.id)
         .filter(
             Reservation.user_id == user_id,
-            Reservation.start_time >= month_start,
-            Reservation.end_time.isnot(None)
+            Reservation.end_time.isnot(None),
+            Reservation.end_time >= month_start
         )
         .group_by(ParkingLot.id)
         .all()
     )
 
-    # 3) Format results
+    # Shape the JSON response
     summary = []
     for row in results:
         summary.append({
-            'lot_name': row.lot_name,
-            'times_parked': int(row.times_parked or 0),
+            'lot_name':           row.lot_name,
+            'times_parked':       int(row.times_parked or 0),
             'total_time_minutes': (row.total_time_secs or 0) / 60,
-            'total_cost': round(row.total_cost or 0, 2)
+            'total_cost':         round(row.total_cost or 0, 2),
         })
 
-    return jsonify(summary), 200
+    return jsonify({ 'summary': summary }), 200
+
 
 @app.route('/user/lots', methods=['GET'])
 @jwt_required()
@@ -518,17 +527,31 @@ def release_reservation():
     if spot:
         spot.is_reserved = False
 
-    # Update reservation with end time and cost
+    # Set end time
     reservation.end_time = datetime.utcnow()
+
+    # Calculate duration in hours, always round up to 1+ hour for billing
     duration_hours = (reservation.end_time - reservation.start_time).total_seconds() / 3600
-    cost_per_hour = 20
-    reservation.cost = round(duration_hours * cost_per_hour, 2)
+    billed_hours = max(1, ceil(duration_hours))
+
+    # ✅ Fetch lot and use its dynamic price_per_hour
+    lot = ParkingLot.query.get(reservation.lot_id)
+    print(f"[DEBUG] Lot price per hour: ₹{lot.price_per_hour}")
+    if not lot:
+        return jsonify({"msg": "Parking lot not found"}), 404
+
+    cost_per_hour = lot.price_per_hour
+    reservation.cost = round(billed_hours * cost_per_hour, 2)
+
     db.session.commit()
 
     return jsonify({
         "msg": "Reservation released",
         "duration": round(duration_hours, 2),
-        "cost": reservation.cost
+        "billed_hours": billed_hours,
+        "price_per_hour": cost_per_hour,
+        "cost": reservation.cost,
+        "price_per_hour": lot.price_per_hour
     }), 200
 
 @app.route('/admin/lots/<int:lot_id>', methods=['PUT'])
@@ -558,12 +581,12 @@ def update_parking_lot(lot_id):
 def admin_dashboard():
     # 1) Identify the admin
     admin_id = int(get_jwt_identity())
-    admin = User.query.get(admin_id)
+    admin    = User.query.get(admin_id)
 
     # 2) Fetch all lots created by this admin
     lots = ParkingLot.query.filter_by(created_by=admin_id).all()
 
-    # 3) Build the payload
+    # 3) Build the parking_lots list
     lot_list = []
     for lot in lots:
         lot_list.append({
@@ -582,11 +605,11 @@ def admin_dashboard():
             ]
         })
 
-          # Build the lot_summary list
+    # 4) Build the lot_summary list (for your pie chart)
     lot_summary = []
     for lot in ParkingLot.query.all():
-        # sum active/endless reservation costs
         total_rev = 0
+        # Sum ongoing reservations’ cost = hours * price/hr
         for resv in Reservation.query.filter_by(
             lot_id=lot.id, 
             end_time=None
@@ -595,24 +618,93 @@ def admin_dashboard():
             total_rev += round(hours * lot.price_per_hour, 2)
 
         lot_summary.append({
-            'name': lot.name,
+            'name':    lot.name,
             'revenue': total_rev
         })
 
-    # 4) Aggregate stats
     total_spots     = sum(len(l.spots) for l in lots)
     available_spots = sum(spot['is_available'] for l in lot_list for spot in l['spots'])
     reserved_spots  = total_spots - available_spots
+   # Count everyone except the admin themselves
+    total_users = User.query.filter(User.id != admin_id).count()
+
+
+    admin_lot_ids = {lot['id'] for lot in lot_list}
+    total_revenue = sum(
+       item['revenue']
+       for item in lot_summary
+       if item['name'] in {lot['name'] for lot in lot_list}
+   )
 
     return jsonify({
-        'username':        admin.fullname,
-        'total_lots':      len(lot_list),
-        'total_spots':     total_spots,
-        'available_spots': available_spots,
-        'reserved_spots':  reserved_spots,
-        'lot_summary':     lot_summary,             # fill as needed
-        'parking_lots':    lot_list
+        'username'        : admin.fullname,
+        'total_lots'      : len(lot_list),
+        'total_spots'     : total_spots,
+        'available_spots' : available_spots,
+        'reserved_spots'  : reserved_spots,
+        'lot_summary'     : lot_summary,
+        'parking_lots'    : lot_list,
+
+        # ← your new fields:
+        'total_users'     : total_users,
+        'total_revenue'   : total_revenue
     }), 200
+
+from datetime import datetime
+
+def calculate_cost(start_time: datetime, end_time: datetime, rate_per_hour: float) -> float:
+    # 1. Compute total seconds between start and end
+    total_seconds = (end_time - start_time).total_seconds()
+
+    # 2. Convert to hours (float)
+    hours = total_seconds / 3600
+
+    # 3. Enforce a minimum of 1 billable hour
+    billable_hours = max(hours, 1)
+
+    # 4. Return cost rounded to two decimals
+    return round(billable_hours * rate_per_hour, 2)
+
+
+@app.route('/admin/bookings', methods=['GET'])
+@jwt_required()
+@admin_required_route
+def admin_bookings():
+    # Identify admin
+    admin_id = int(get_jwt_identity())
+
+    # Query all reservations for lots this admin owns
+    records = []
+    reservations = (
+        Reservation
+        .query
+        .join(ParkingLot, Reservation.lot_id == ParkingLot.id)
+        .filter(ParkingLot.created_by == admin_id)
+        .all()
+    )
+
+    for resv in reservations:
+        lot  = resv.lot
+        user = resv.user
+
+       # compute cost for both released and ongoing reservations:
+        end = resv.end_time or datetime.utcnow()
+        end  = resv.end_time or datetime.utcnow()
+        cost = calculate_cost(resv.start_time, end, lot.price_per_hour)
+
+
+        records.append({
+            'id'         : resv.id,
+            'user'       : {'id': user.id, 'email': user.email, 'fullname': user.fullname},
+            'lot'        : {'id': lot.id,  'name' : lot.name},
+            'spot_number': resv.spot.spot_number,
+            'start_time' : resv.start_time.isoformat(),
+            'end_time'   : resv.end_time.isoformat() if resv.end_time else None,
+            'cost'       : cost
+        })
+
+    return jsonify({'bookings': records}), 200
+
 
 @app.route('/admin/profile', methods=['PUT'])
 @jwt_required()
@@ -659,8 +751,22 @@ def admin_list_users():
 @app.route('/user/assign', methods=['POST'])
 @jwt_required()
 def assign_spot():
-    user_id = get_jwt_identity()
-    data = request.get_json() or {}
+    # 1) Strongly type your identity and load the user
+    try:
+        user_id = int(get_jwt_identity())
+    except (TypeError, ValueError):
+        return jsonify(msg='Invalid user identity'), 400
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify(msg='User not found'), 404
+
+    # 2) Refuse if this isn’t a “regular” user
+    if user.role != 'user':
+        return jsonify(msg='Only end-users can reserve spots'), 403
+
+    # 3) Now proceed exactly as before
+    data   = request.get_json() or {}
     lot_id = data.get('lot_id')
     if not lot_id:
         return jsonify(msg='lot_id required'), 400
@@ -669,32 +775,31 @@ def assign_spot():
     if not lot:
         return jsonify(msg='Lot not found'), 404
 
-    # pick first free spot
     spot = next((s for s in lot.spots if not s.is_reserved), None)
     if not spot:
         return jsonify(msg='No spots available'), 400
 
-    # mark it “held” so nobody else grabs it
     spot.is_reserved = True
 
-    # create a PENDING reservation row with UTC timestamp
     new_resv = Reservation(
-        user_id=user_id,
-        lot_id=lot.id,
-        spot_id=spot.id,
-        start_time=datetime.now(timezone.utc),  # ← timezone-aware
-        end_time=None,
-        vehicle_number=''   # fill on confirm
+        user_id        = user_id,
+        lot_id         = lot.id,
+        spot_id        = spot.id,
+        start_time     = datetime.now(timezone.utc),
+        end_time       = None,
+        vehicle_number = ''
     )
     db.session.add(new_resv)
     db.session.commit()
 
     return jsonify({
-        'reservation_id': new_resv.id,
-        'spot_number': spot.spot_number,
-        'cost': lot.price_per_hour,
-        'start_time': new_resv.start_time.isoformat()  # includes "+00:00"
-    }), 200
+       'reservation_id': new_resv.id,
+       'spot_number':   spot.spot_number,
+       'cost':          lot.price_per_hour,
+       'start_time':    new_resv.start_time.isoformat(),
+       'user_id':       new_resv.user_id          # ← add this line
+   }), 200
+
 
 @app.route('/api/reservations/confirm', methods=['POST'], endpoint='api_confirm_reservation')
 @jwt_required()
@@ -725,7 +830,15 @@ def api_confirm_reservation():
     spot.is_reserved = True
 
     db.session.commit()
-    return jsonify(message='Booking confirmed'), 200
+    return jsonify({
+        'message': 'Booking confirmed',
+        'reservation': {
+            'id':       reservation.id,
+            'user_id':  reservation.user_id,
+            'start_time': reservation.start_time.isoformat()
+        }
+    }), 200
+
 
 @app.route('/user/profile', methods=['GET'])
 @jwt_required()

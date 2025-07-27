@@ -1,3 +1,4 @@
+
 <template>
   <div v-if="loading" class="loader-container">
     <div class="spinner-border text-primary" role="status"></div>
@@ -31,12 +32,19 @@
               </div>
               <div class="d-flex justify-content-between align-items-center mb-2">
                 <span class="text-muted">User ID</span>
-                <strong>{{ user.id }}</strong>
+                <strong>{{ bookingData.userId }}</strong>
               </div>
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="text-muted">Rate per Hour</span>
-                <strong class="text-success">₹{{ bookingData.cost }}</strong>
+
+              <div class="d-flex flex-column justify-content-between mb-3">
+                <div class="d-flex justify-content-between align-items-center w-100">
+                  <span class="text-muted">Rate per Hour</span>
+                  <strong class="text-success">₹{{ bookingData.cost }}</strong>
+                </div>
+                <small class="text-secondary">
+                  Minimum billing unit: 1 hour (you’ll be charged for a full hour even if you leave sooner)
+                </small>
               </div>
+
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <span class="text-muted">Start Time</span>
                 <strong>{{ formatDateIST(bookingData.startTime) }}</strong>
@@ -45,8 +53,12 @@
             <hr />
             <div class="mb-3">
               <label class="form-label fw-semibold">Enter Vehicle Number</label>
-              <input v-model="vehicleNumber" type="text" class="form-control form-control-lg shadow-sm"
-                placeholder="e.g. TN01AB1234" />
+              <input
+                v-model="vehicleNumber"
+                type="text"
+                class="form-control form-control-lg shadow-sm"
+                placeholder="e.g. TN01AB1234"
+              />
             </div>
           </div>
           <div class="modal-footer bg-light px-4 py-3 d-flex justify-content-between">
@@ -72,7 +84,12 @@
             </select>
           </div>
           <div class="col">
-            <input v-model="searchQuery" type="text" class="form-control shadow-sm" placeholder="Search..." />
+            <input
+              v-model="searchQuery"
+              type="text"
+              class="form-control shadow-sm"
+              placeholder="Search..."
+            />
           </div>
         </div>
 
@@ -93,11 +110,17 @@
                   <ul class="list-unstyled mb-0 small">
                     <li><strong>Total:</strong> {{ lot.total_spots }}</li>
                     <li><strong>Free:</strong> {{ lot.available_spots }}</li>
-                    <li><strong>Rate:</strong> ₹{{ lot.price_per_hour }}</li>
+                    <li>
+                      <strong>Rate:</strong> ₹{{ lot.price_per_hour }}
+                      <small class="text-muted">/hr (min 1 hr)</small>
+                    </li>
                   </ul>
                 </div>
-                <button class="btn btn-outline-primary mt-3 w-100" :disabled="lot.available_spots === 0"
-                  @click="openBookingModal(lot)">
+                <button
+                  class="btn btn-outline-primary mt-3 w-100"
+                  :disabled="lot.available_spots === 0"
+                  @click="openBookingModal(lot)"
+                >
                   Book Spot
                 </button>
               </div>
@@ -112,8 +135,7 @@
 <script>
 import axios from 'axios'
 import UserNavbar from '../components/UserNavbar.vue'
-import { DateTime } from 'luxon';
-
+import { DateTime } from 'luxon'
 
 export default {
   name: 'UserLots',
@@ -134,7 +156,8 @@ export default {
         spotNumber: null,
         reservationId: null,
         cost: 0,
-        startTime: null    // ← initialize here
+        userId: null,
+        startTime: null
       }
     }
   },
@@ -155,8 +178,12 @@ export default {
       const token = localStorage.getItem('token')
       try {
         const [userRes, lotsRes] = await Promise.all([
-          axios.get('http://localhost:5000/user/dashboard', { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get('http://localhost:5000/user/lots',      { headers: { Authorization: `Bearer ${token}` } })
+          axios.get('http://localhost:5000/user/dashboard', {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          axios.get('http://localhost:5000/user/lots', {
+            headers: { Authorization: `Bearer ${token}` }
+          })
         ])
         this.user = userRes.data
         this.lots = lotsRes.data
@@ -172,32 +199,40 @@ export default {
         this.loading = false
       }
     },
+
     async openBookingModal(lot) {
-  const token = localStorage.getItem('token');
-  try {
-    const res = await axios.post(
-      'http://localhost:5000/user/assign',
-      { lot_id: lot.id },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    
-    // Set start time to current IST time
-    const nowIST = DateTime.now().setZone('Asia/Kolkata').toISO();
-    
-    this.bookingData = {
-      lotId: lot.id,
-      lotName: lot.name,
-      spotNumber: res.data.spot_number,
-      reservationId: res.data.reservation_id,
-      cost: res.data.cost,
-      startTime: nowIST // Use current IST time
-    };
-    this.vehicleNumber = '';
-    this.showModal = true;
-  } catch {
-    alert('Could not hold a spot.');
-  }
-},
+      const token = localStorage.getItem('token')
+      try {
+        const res = await axios.post(
+          'http://localhost:5000/user/assign',
+          { lot_id: lot.id },
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+
+        // Use current IST time for Start Time
+        const nowIST = DateTime.now().setZone('Asia/Kolkata').toISO()
+
+        // Convert DB user_id → your UI index (subtract admin id=1)
+        const rawId = res.data.user_id
+        const displayId = rawId - 1
+
+        this.bookingData = {
+          lotId: lot.id,
+          lotName: lot.name,
+          spotNumber: res.data.spot_number,
+          reservationId: res.data.reservation_id,
+          cost: res.data.cost,
+          startTime: nowIST,
+          userId: displayId
+        }
+
+        this.vehicleNumber = ''
+        this.showModal = true
+      } catch {
+        alert('Could not hold a spot.')
+      }
+    },
+
     async confirmBooking() {
       const token = localStorage.getItem('token')
       try {
@@ -215,18 +250,18 @@ export default {
         alert('Booking failed.')
       }
     },
+
     closeModal() {
       this.showModal = false
     },
-     formatDateIST(dateStr) {
-      if (!dateStr) return 'N/A';
-      // Parse with explicit India timezone
-      const ist = DateTime.fromISO(dateStr).setZone('Asia/Kolkata');
-      return ist.isValid 
-        ? ist.toFormat("dd LLL yyyy, hh:mm a 'IST'") 
-        : 'Invalid Date';
-    },
 
+    formatDateIST(dateStr) {
+      if (!dateStr) return 'N/A'
+      const ist = DateTime.fromISO(dateStr).setZone('Asia/Kolkata')
+      return ist.isValid
+        ? ist.toFormat("dd LLL yyyy, hh:mm a 'IST'")
+        : 'Invalid Date'
+    }
   },
   mounted() {
     this.fetchData()

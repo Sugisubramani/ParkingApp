@@ -37,7 +37,7 @@ class ParkingSpot(db.Model):
     __tablename__ = 'parking_spot'
 
     id           = db.Column(db.Integer, primary_key=True)
-    lot_id       = db.Column(db.Integer, db.ForeignKey('parking_lot.id'), nullable=False)
+    lot_id = db.Column(db.Integer, db.ForeignKey('parking_lot.id', ondelete='CASCADE'), nullable=False)
     spot_number  = db.Column(db.Integer,                     nullable=False)
     is_reserved  = db.Column(db.Boolean, default=False)
 

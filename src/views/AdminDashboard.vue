@@ -35,247 +35,318 @@
 
       <!-- Dashboard View -->
       <div v-else-if="currentView === 'dashboard'" class="p-4">
-        <div class="row text-center g-3 mb-4">
-          <div class="col" v-for="(label, key) in {
+        <!-- STATS GRID -->
+        <div class="row g-4 mb-5 text-center">
+          <div class="col-6 col-md-4 col-xl-2" v-for="(label, key) in {
             'Total Lots': 'totalLots',
             'Total Spots': 'totalSpots',
             Available: 'availableSpots',
-            Reserved: 'reservedSpots'
+            Reserved: 'reservedSpots',
+            'Total Users': 'totalUsers',
+            'Total Revenue': 'totalRevenue'
           }" :key="key">
-            <div class="stat-box bg-white rounded shadow-sm p-3">
-              <h6 class="stat-title">{{ key }}</h6>
-              <h4 class="stat-value" :class="{
-                'text-primary': key === 'Total Lots',
-                'text-success': key === 'Total Spots',
-                'text-info': key === 'Available',
-                'text-danger': key === 'Reserved'
-              }">
-                {{ stats[label] }}
-              </h4>
+            <div class="card shadow-sm border-0">
+              <div class="card-body py-3">
+                <h6 class="card-subtitle mb-1 text-muted">{{ key }}</h6>
+                <h4 class="card-title mb-0 fw-bold" :class="{
+                  'text-primary': key === 'Total Lots',
+                  'text-success': key === 'Total Spots',
+                  'text-info': key === 'Available',
+                  'text-danger': key === 'Reserved',
+                  'text-dark': key === 'Total Users',
+                  'text-warning': key === 'Total Revenue'
+                }">
+                  {{ key === 'Total Users'
+                    ? totalUsers
+                    : key === 'Total Revenue'
+                      ? '₹ ' + (typeof totalRevenue === 'number'
+                        ? totalRevenue.toFixed(2)
+                        : '0.00')
+                      : stats[label]
+                  }}
+                </h4>
+              </div>
             </div>
           </div>
         </div>
 
+        <!-- CHARTS -->
         <div class="row g-4">
-          <!-- Availability Summary (Bar) -->
+          <!-- Availability Summary Bar Chart -->
           <div class="col-lg-6">
-            <h5 class="mt-4">Availability Summary</h5>
-            <div class="chart-container" style="height:400px;position:relative;">
-              <canvas ref="availabilityChart" style="width:100%; height:100%;"></canvas>
+            <div class="card shadow-sm border-0 h-100">
+              <div class="card-body">
+                <h5 class="card-title">Availability Summary</h5>
+                <div class="chart-container" style="height:400px; position:relative;">
+                  <canvas ref="availabilityChart" style="width:100%; height:100%;"></canvas>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Revenue by Lot (Pie) -->
+          <!-- Revenue by Lot Pie Chart -->
           <div class="col-lg-6">
-            <h5 class="mt-4">Revenue by Lot</h5>
-            <div class="chart-container" style="height:400px;position:relative;">
-              <canvas ref="revenuePieChart" style="width:100%; height:100%;"></canvas>
+            <div class="card shadow-sm border-0 h-100">
+              <div class="card-body">
+                <h5 class="card-title">Revenue by Lot</h5>
+                <div class="chart-container" style="height:400px; position:relative;">
+                  <canvas ref="revenuePieChart" style="width:100%; height:100%;"></canvas>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+
+      <!-- Bookings View -->
+      <div v-else-if="currentView === 'bookings'" class="p-4">
+        <div class="card shadow-sm border-0 p-4">
+          <h4 class="fw-bold text-primary text-center mb-4">Booking History</h4>
+
+          <div class="table-responsive">
+            <table class="table table-hover align-middle table-borderless">
+              <thead class="table-dark">
+                <tr>
+                  <th>ID</th>
+                  <th>User</th>
+                  <th>Lot</th>
+                  <th>Spot</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Cost</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr v-for="(b, idx) in bookings" :key="b.id">
+                  <td class="fw-semibold text-muted">{{ idx + 1 }}</td>
+
+                  <td>
+                    <div class="fw-semibold">{{ b.user.fullname }}</div>
+                    <small class="text-muted">{{ b.user.email }}</small>
+                  </td>
+
+                  <td>{{ b.lot.name }}</td>
+                  <td><span class="badge bg-secondary">{{ b.spot_number }}</span></td>
+
+                  <td>
+                    <span class="text-nowrap">{{ formatDateIST(b.start_time) }}</span>
+                  </td>
+
+                  <td>
+                    <span v-if="b.end_time" class="text-nowrap">{{ formatDateIST(b.end_time) }}</span>
+                    <span v-else class="text-warning fst-italic">In Progress</span>
+                  </td>
+
+                  <td>
+                    <span v-if="b.cost" class="fw-bold text-success">₹ {{ b.cost }}</span>
+                    <span v-else class="text-muted">—</span>
+                  </td>
+                </tr>
+
+                <tr v-if="!bookings.length">
+                  <td colspan="7" class="text-center text-muted py-4">
+                    🚫 No bookings found
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+
+
       <!-- Home View -->
       <div v-if="currentView === 'home'" class="p-4">
+        <!-- Add Lot Button -->
+        <div class="d-flex justify-content-center mb-4">
+          <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+            @click="showNewLotModal = true">
+            <i class="bi bi-plus-circle"></i>
+            Add Lot
+          </button>
 
-        <!-- 1) Add Lot Button -->
-<div class="d-flex justify-content-center mb-4">
-  <button class="btn btn-primary" @click="showNewLotModal = true">
-    + Add Lot
-  </button>
-</div>
+        </div>
 
         <!-- Search Bar -->
-        <div class="d-flex align-items-center mb-3">
+        <div class="d-flex align-items-center mb-4">
           <!-- Dropdown for search-by field -->
-          <select v-model="searchBy" class="form-select w-auto me-2">
+          <select v-model="searchBy" class="form-select me-3" style="width: 130px; font-size: 1rem; height: 45px;">
             <option value="userId">User ID</option>
             <option value="location">Location</option>
             <option value="pincode">Pincode</option>
           </select>
 
           <!-- Text input for search query -->
-          <input v-model="searchQuery" type="text" placeholder="Enter search term" class="form-control me-2" />
+          <input v-model="searchQuery" type="text" placeholder="Enter search term" class="form-control me-3"
+            style="font-size: 1rem; height: 45px; max-width: 820px;" />
 
           <!-- Search button -->
-          <button class="btn btn-primary me-2" @click="performSearch()">
+          <button class="btn btn-primary me-2 px-4" style="height: 40px;" @click="performSearch()">
             Search
           </button>
 
           <!-- Clear search -->
-          <button class="btn btn-outline-secondary" @click="clearSearch()">
+          <button class="btn btn-outline-secondary px-4" style="height: 40px;" @click="clearSearch()">
             Clear
           </button>
         </div>
 
 
-        <!-- 2) New Parking Modal -->
-        <div v-if="showNewLotModal" class="modal-backdrop" @click.self="showNewLotModal = false">
-          <div class="modal-content p-4 shadow">
-            <h5>New Parking</h5>
-
-            <div class="mb-2">
-              <label class="form-label">Prime Location Name</label>
-              <input v-model="newLot.name" class="form-control" />
-            </div>
-            <div class="mb-2">
-              <label class="form-label">Address</label>
-              <input v-model="newLot.address" class="form-control" />
-            </div>
-            <div class="mb-2">
-              <label class="form-label">Pincode</label>
-              <input v-model="newLot.pincode" class="form-control" />
-            </div>
-            <div class="mb-2">
-              <label class="form-label">Price (per hour)</label>
-              <input v-model="newLot.price" type="number" class="form-control" />
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Maximum Spots</label>
-              <input v-model="newLot.maxSpots" type="number" class="form-control" />
-            </div>
-
-            <div class="text-end">
-              <button class="btn btn-secondary me-2" @click="showNewLotModal = false">
-                Cancel
-              </button>
-              <button class="btn btn-primary" @click="addNewLot">
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
-        <!-- 3) Parking Lots List -->
+        <!-- Parking Lots List -->
         <div v-if="parkingLots.length">
           <div v-for="lot in parkingLots" :key="lot.id"
-            class="lot-card bg-white shadow-sm p-3 mb-2 d-flex justify-content-between align-items-center">
+            class="card mb-3 shadow-sm border-0 p-3 d-flex flex-md-row flex-column justify-content-between align-items-md-center align-items-start">
             <div>
-              <strong>{{ lot.name }}</strong>
-              (Occupied = {{lot.spots.filter(s => !s.is_available).length}}
-              /{{ lot.spots.length }})
+              <h5 class="mb-1">{{ lot.name }}</h5>
+              <small class="text-muted">
+                Occupied: {{lot.spots.filter(s => !s.is_available).length}} /
+                {{ lot.spots.length }}
+              </small>
             </div>
 
-            <div class="btn-group btn-group-sm">
-              <!-- Edit icon -->
+            <div class="btn-group btn-group-sm mt-2 mt-md-0">
               <button class="btn btn-outline-secondary" @click="openEditLot(lot)">
-                <i class="bi bi-pencil-square"></i>
+                <i class="bi bi-pencil-square me-1"></i>Edit
               </button>
-
-              <!-- View icon -->
               <button class="btn btn-outline-primary" @click="viewLot(lot)">
                 View
               </button>
-
-              <!-- Delete icon: only if no occupied spots -->
-              <button v-if="lot.spots.filter(s => !s.is_available).length === 0" class="btn btn-outline-danger"
+              <button class="btn btn-outline-danger" :disabled="lot.spots.some(s => !s.is_available)"
                 @click="deleteLot(lot.id)">
                 <i class="bi bi-trash"></i>
               </button>
-            </div>
 
+            </div>
           </div>
         </div>
+        <div v-else class="text-muted text-center py-5">🚫 No parking lots yet.</div>
+        <!-- 2) New Parking Modal -->
+        <div v-if="showNewLotModal" class="modal-backdrop" @click.self="showNewLotModal = false">
+          <div class="modal-content p-3 shadow" style="max-width: 600px; margin: auto;">
+            <h5 class="mb-3">Add New Parking Lot</h5>
 
-        <div v-else class="text-muted">No parking lots yet.</div>
+            <div class="row g-2">
+              <div class="col-12">
+                <label class="form-label">Location Name</label>
+                <input v-model="newLot.name" class="form-control" placeholder="e.g., Marina Lot" />
+              </div>
 
-        <!-- 4) Lot Details Modal -->
-        <div v-if="showLotDetails" class="modal-backdrop" @click.self="showLotDetails = false">
-          <div class="modal-content p-4 shadow">
-            <h5>{{ selectedLot.name }}</h5>
-            <p>Address: {{ selectedLot.location }}</p>
-            <p>Pincode: {{ selectedLot.pincode }}</p>
-            <p>Price/hr: {{ selectedLot.price_per_hour }}</p>
-            <p>Spots: {{ selectedLot.spots.length }}</p>
+              <div class="col-md-8">
+                <label class="form-label">Address</label>
+                <input v-model="newLot.address" class="form-control" />
+              </div>
 
-            <div class="d-flex flex-wrap mt-3">
-              <div v-for="spot in selectedLot.spots" :key="spot.id"
-                class="spot-box m-1 d-flex justify-content-center align-items-center" :class="{
-                  'bg-success': spot.is_available,
-                  'bg-danger': !spot.is_available
-                }" @click="onSpotClick(spot)">
-                {{ spot.number }}
+              <div class="col-md-4">
+                <label class="form-label">Pincode</label>
+                <input v-model="newLot.pincode" class="form-control" />
+              </div>
 
+              <div class="col-md-6">
+                <label class="form-label">Price (per hour)</label>
+                <input v-model="newLot.price" type="number" class="form-control" />
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Max Spots</label>
+                <input v-model="newLot.maxSpots" type="number" class="form-control" />
               </div>
             </div>
 
-
             <div class="text-end mt-3">
-              <button class="btn btn-secondary" @click="showLotDetails = false">
-                Close
-              </button>
+              <button class="btn btn-sm btn-outline-secondary me-2" @click="showNewLotModal = false">Cancel</button>
+              <button class="btn btn-sm btn-primary" @click="addNewLot">Add</button>
             </div>
           </div>
         </div>
-      </div>
 
+        <!-- Lot Details Modal -->
+        <div v-if="showLotDetails" class="modal-backdrop" @click.self="showLotDetails = false">
+          <div class="modal-content p-4 shadow">
+            <h5 class="mb-3">{{ selectedLot.name }}</h5>
+            <p class="mb-1"><strong>Address:</strong> {{ selectedLot.location }}</p>
+            <p class="mb-1"><strong>Pincode:</strong> {{ selectedLot.pincode }}</p>
+            <p class="mb-1"><strong>Price/hr:</strong> ₹ {{ selectedLot.price_per_hour }}</p>
+            <p class="mb-3"><strong>Spots:</strong> {{ selectedLot.spots.length }}</p>
 
-      <!-- Edit Lot Modal -->
-      <div v-if="showEditLotModal" class="modal-backdrop" @click.self="showEditLotModal = false">
-        <div class="modal-content p-4 shadow">
-          <h5>Edit Parking Lot</h5>
+            <div class="d-flex flex-wrap gap-2">
+              <div v-for="spot in selectedLot.spots" :key="spot.id" class="badge text-bg-light p-3 rounded-2"
+                :class="spot.is_available ? 'bg-success' : 'bg-danger'" style="cursor: pointer;"
+                @click="onSpotClick(spot)">
+                {{ spot.number }}
+              </div>
+            </div>
 
-          <div class="mb-2">
-            <label class="form-label">Name</label>
-            <input v-model="editLotForm.name" class="form-control" />
+            <div class="text-end mt-4">
+              <button class="btn btn-secondary" @click="showLotDetails = false">Close</button>
+            </div>
           </div>
+        </div>
 
-          <div class="mb-2">
-            <label class="form-label">Location</label>
-            <input v-model="editLotForm.location" class="form-control" />
-          </div>
-
-          <div class="mb-2">
-            <label class="form-label">Pincode</label>
-            <input v-model="editLotForm.pincode" class="form-control" />
-          </div>
-
-          <div class="mb-2">
-            <label class="form-label">Price/hr</label>
-            <input v-model="editLotForm.price_per_hour" type="number" class="form-control" />
-          </div>
-
-
-          <div class="text-end">
-            <button class="btn btn-secondary me-2" @click="showEditLotModal = false">
-              Cancel
-            </button>
-            <button class="btn btn-primary" @click="saveEditedLot()">
-              Save
-            </button>
+        <!-- Edit Lot Modal -->
+        <div v-if="showEditLotModal" class="modal-backdrop" @click.self="showEditLotModal = false">
+          <div class="modal-content p-4 shadow">
+            <h5>Edit Parking Lot</h5>
+            <div class="mb-2">
+              <label class="form-label">Name</label>
+              <input v-model="editLotForm.name" class="form-control" />
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Location</label>
+              <input v-model="editLotForm.location" class="form-control" />
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Pincode</label>
+              <input v-model="editLotForm.pincode" class="form-control" />
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Price/hr</label>
+              <input v-model="editLotForm.price_per_hour" type="number" class="form-control" />
+            </div>
+            <div class="text-end">
+              <button class="btn btn-secondary me-2" @click="showEditLotModal = false">Cancel</button>
+              <button class="btn btn-primary" @click="saveEditedLot">Save</button>
+            </div>
           </div>
         </div>
       </div>
 
 
       <!-- Users View -->
-      <div v-else-if="currentView === 'users'" class="p-4">
-        <h4>Registered Users</h4>
+      <div v-else-if="currentView === 'users'" class="p-4 bg-users-view">
+        <div class="card shadow border-0 p-4 glass-table-card">
+          <h4 class="mb-4 fw-bold text-primary text-center">Registered Users</h4>
 
-        <table class="table table-bordered mt-3">
-          <thead class="table-light">
-            <tr>
-              <th>ID</th>
-              <th>Email</th>
-              <th>Fullname</th>
-              <th>Address</th>
-              <th>Pincode</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr v-for="(u, idx) in users" :key="u.id">
-              <!-- use idx+1 for your ID column -->
-              <td>{{ idx + 1 }}</td>
-              <td>{{ u.email }}</td>
-              <td>{{ u.fullname }}</td>
-              <td>{{ u.address }}</td>
-              <td>{{ u.pincode }}</td>
-            </tr>
-            <tr v-if="!users.length">
-              <td colspan="5" class="text-center text-muted">No users found</td>
-            </tr>
-          </tbody>
-        </table>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle text-white table-borderless custom-table">
+              <thead class="table-dark">
+                <tr>
+                  <th scope="col">ID</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Full Name</th>
+                  <th scope="col">Address</th>
+                  <th scope="col">Pincode</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(u, idx) in users" :key="u.id" class="table-row">
+                  <td>{{ idx + 1 }}</td>
+                  <td>{{ u.email }}</td>
+                  <td>{{ u.fullname }}</td>
+                  <td>{{ u.address }}</td>
+                  <td>{{ u.pincode }}</td>
+                </tr>
+                <tr v-if="!users.length">
+                  <td colspan="5" class="text-center text-muted py-4">🚫 No users found.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
+
 
       <!-- Spot Details Modal -->
       <div v-if="showSpotModal" class="modal-backdrop" @click.self="showSpotModal = false">
@@ -303,11 +374,25 @@
           <!-- Occupied Spot -->
           <template v-else>
             <ul class="list-unstyled mb-3">
-              <li><strong>ID:</strong> {{ spotDetails.customer_id }}</li>
+              <!-- 3.1) User ID is already correct -->
+              <li><strong>User ID:</strong> {{ spotDetails.customer_id }}</li>
+
+              <!-- 3.2) Vehicle number stays the same -->
               <li><strong>Vehicle No:</strong> {{ spotDetails.vehicle_no }}</li>
-              <li><strong>Start Time:</strong> {{ spotDetails.start_time }}</li>
-              <li><strong>Est Cost:</strong> {{ spotDetails.est_cost }}</li>
+
+              <!-- 3.3) Format start_time via our helper -->
+              <li>
+                <strong>Start Time:</ strong>
+                  {{ formatDateIST(spotDetails.start_time) }}
+              </li>
+
+              <!-- 3.4) Calculate cost, passing in the rate -->
+              <li>
+                <strong>Est Cost:</strong>
+                ₹{{ calculateEstCost(spotDetails.start_time, spotDetails.rate_per_hour) }}
+              </li>
             </ul>
+
             <div class="text-end">
               <button class="btn btn-secondary" @click="showSpotModal = false">
                 Close
@@ -324,6 +409,7 @@
 import Sidebar from '../components/Sidebar.vue'
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
+import { DateTime } from 'luxon'
 
 
 import axios from 'axios'
@@ -347,7 +433,9 @@ export default {
         reservedSpots: 0,
         lotSummary: []
       },
-
+      bookings: [],
+      totalUsers: 0,
+      totalRevenue: 0,
       showPassword: false,
       profileForm: {
         email: 'admin@example.com',
@@ -365,24 +453,17 @@ export default {
       },
       showLotDetails: false,
       selectedLot: null,
-      // 1) Which field to search by
       searchBy: 'location',
 
-      // 2) The text you’re searching for
       searchQuery: '',
-      // 1) Toggle for showing the spot modal
       showSpotModal: false,
 
-      // 2) The spot object you clicked
       selectedSpot: null,
 
-      // 3) Details for occupied spots (we’ll fill this next)
       spotDetails: null,
 
-      // 1) Toggle for showing the Edit modal (moved out of stats)
       showEditLotModal: false,
 
-      // 2) Form model for editing a lot (moved out of stats)
       editLotForm: {
         id: null,
         name: '',
@@ -413,6 +494,10 @@ export default {
       this.currentView = view
       if (view === 'users') this.fetchUsers()
       if (view === 'dashboard') this.fetchLots()
+      this.currentView = view;
+      if (view === 'bookings') {
+        this.fetchBookings();
+      }
     },
     async saveProfile() {
       try {
@@ -451,30 +536,62 @@ export default {
       });
     },
 
+
+    // 2.1) Format any ISO UTC string into IST display
+    formatDateIST(dateStr) {
+      if (!dateStr) return '— in progress —'
+      const dtUtc = DateTime.fromISO(dateStr, { zone: 'utc' })
+      const dtIst = dtUtc.setZone('Asia/Kolkata')
+      return dtIst.toFormat("dd LLL yyyy, hh:mm a 'IST'")
+    },
+
+    // 2.2) Compute Est Cost from start time + rate, min 1 hour
+    calculateEstCost(startStr, rate) {
+      const startUtc = DateTime.fromISO(startStr, { zone: 'utc' })
+      const nowIst = DateTime.now().setZone('Asia/Kolkata')
+      let hours = nowIst.diff(startUtc, 'hours').hours
+      hours = Math.max(hours, 1)    // enforce 1-hour minimum
+      return (hours * rate).toFixed(2)
+    },
+
+
+    async fetchBookings() {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('http://127.0.0.1:5000/admin/bookings', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const payload = await res.json();
+        this.bookings = payload.bookings;
+      } catch (err) {
+        alert('Failed to load bookings: ' + err.message);
+      }
+    },
+
     async deleteSpot(lotId, spotId) {
-  try {
-    // 1. Optimistically remove from UI
-    const lot = this.parkingLots.find(l => l.id === lotId);
-    if (lot) {
-      lot.spots = lot.spots.filter(s => s.id !== spotId);
-    }
+      try {
+        // 1. Optimistically remove from UI
+        const lot = this.parkingLots.find(l => l.id === lotId);
+        if (lot) {
+          lot.spots = lot.spots.filter(s => s.id !== spotId);
+        }
 
-    // 2. Close modal IMMEDIATELY (before API call)
-    this.showSpotModal = false;  // This is the key line you're missing
+        // 2. Close modal IMMEDIATELY (before API call)
+        this.showSpotModal = false;  // This is the key line you're missing
 
-    // 3. Make API call in background
-    const token = localStorage.getItem('token');
-    await axios.delete(
-      `http://localhost:5000/admin/lots/${lotId}/spots/${spotId}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+        // 3. Make API call in background
+        const token = localStorage.getItem('token');
+        await axios.delete(
+          `http://localhost:5000/admin/lots/${lotId}/spots/${spotId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
 
-  } catch (err) {
-    // If error occurs, refresh data
-    this.fetchLots();
-    console.error('Delete failed:', err);
-  }
-},
+      } catch (err) {
+        // If error occurs, refresh data
+        this.fetchLots();
+        console.error('Delete failed:', err);
+      }
+    },
     clearSearch() {
       this.searchQuery = '';
       this.parkingLots = this.allParkingLots;
@@ -551,6 +668,7 @@ export default {
           headers: { Authorization: `Bearer ${token}` }
         })
         const data = await res.json()
+        console.log('🚀 DASHBOARD PAYLOAD:', data);
         if (!res.ok) throw new Error(data.msg || 'Unauthorized')
 
         // Map in the new fields
@@ -562,6 +680,7 @@ export default {
           price_per_hour: lot.price_per_hour,
           spots: lot.spots
         }))
+
         this.allParkingLots = this.parkingLots
 
         this.username = data.username || ''
@@ -584,6 +703,10 @@ export default {
           reservedSpots: data.reserved_spots,
           lotSummary: data.lot_summary
         };
+
+        this.totalUsers = data.total_users;    // ← pull from your API payload
+        this.totalRevenue = data.total_revenue;  // ← ditto
+
         console.log('lotSummary from API →', this.stats.lotSummary);
 
         this.$nextTick(() => this.renderCharts());
@@ -695,46 +818,46 @@ export default {
     },
 
     async deleteLot(lotId) {
-  // 1) Confirm in the UI
-  if (!confirm('Delete this empty lot for good?')) return;
+      // 1) Confirm in the UI
+      if (!confirm('Delete this empty lot for good?')) return;
 
-  // 2) Grab token
-  const token = localStorage.getItem('token');
-  if (!token) {
-    return alert('Not authenticated');
-  }
-
-  try {
-    // 3) Call DELETE endpoint
-    const res = await fetch(
-      `http://127.0.0.1:5000/admin/lots/${lotId}`,
-      {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
+      // 2) Grab token
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return alert('Not authenticated');
       }
-    );
 
-    // 4) Read back the payload
-    const data = await res.json();
-    console.log('DELETE /admin/lots response →', res.status, data);
+      try {
+        // 3) Call DELETE endpoint
+        const res = await fetch(
+          `http://127.0.0.1:5000/admin/lots/${lotId}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
 
-    // 5) Handle errors
-    if (!res.ok) {
-      return alert(data.msg || `Delete failed (${res.status})`);
-    }
+        // 4) Read back the payload
+        const data = await res.json();
+        console.log('DELETE /admin/lots response →', res.status, data);
 
-    // 6) Success—refresh your list
-    alert('Lot deleted successfully');
-    this.fetchLots();
-  }
-  catch (err) {
-    console.error('Network or parsing error:', err);
-    alert('Unexpected error, check console for details');
-  }
-},
+        // 5) Handle errors
+        if (!res.ok) {
+          return alert(data.msg || `Delete failed (${res.status})`);
+        }
+
+        // 6) Success—refresh your list
+        alert('Lot deleted successfully');
+        this.fetchLots();
+      }
+      catch (err) {
+        console.error('Network or parsing error:', err);
+        alert('Unexpected error, check console for details');
+      }
+    },
 
 
     promptEditSpot(lotId, spotId, currentNumber) {
@@ -958,13 +1081,16 @@ export default {
   transition: box-shadow 0.3s ease;
   border-radius: 12px;
 }
+
 .stat-box:hover {
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.1);
 }
+
 .stat-title {
   font-size: 0.9rem;
   color: #6c757d;
 }
+
 .stat-value {
   font-size: 1.6rem;
   font-weight: bold;
@@ -1002,6 +1128,7 @@ export default {
   border-radius: 8px;
   transition: transform 0.2s ease;
 }
+
 .lot-card:hover {
   transform: scale(1.01);
 }
@@ -1016,6 +1143,7 @@ export default {
   cursor: pointer;
   transition: transform 0.2s ease;
 }
+
 .spot-box:hover {
   transform: scale(1.1);
 }
@@ -1043,11 +1171,10 @@ export default {
     opacity: 0;
     transform: scale(0.97);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
   }
 }
-
-
 </style>
