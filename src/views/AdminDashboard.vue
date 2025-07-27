@@ -174,7 +174,7 @@
         <div class="d-flex align-items-center mb-4">
           <!-- Dropdown for search-by field -->
           <select v-model="searchBy" class="form-select me-3" style="width: 130px; font-size: 1rem; height: 45px;">
-            <option value="userId">User ID</option>
+            <option value="userId">User</option>
             <option value="location">Location</option>
             <option value="pincode">Pincode</option>
           </select>
@@ -374,23 +374,26 @@
           <!-- Occupied Spot -->
           <template v-else>
             <ul class="list-unstyled mb-3">
-              <!-- 3.1) User ID is already correct -->
-              <li><strong>User ID:</strong> {{ spotDetails.customer_id }}</li>
-
-              <!-- 3.2) Vehicle number stays the same -->
+              <li><strong>Full Name:</strong> {{ spotDetails.fullname }}</li>
+              <li><strong>Email:</strong> {{ spotDetails.email }}</li>
               <li><strong>Vehicle No:</strong> {{ spotDetails.vehicle_no }}</li>
-
-              <!-- 3.3) Format start_time via our helper -->
               <li>
-                <strong>Start Time:</ strong>
-                  {{ formatDateIST(spotDetails.start_time) }}
+                <strong>Start Time:</strong>
+                {{
+                  new Date(spotDetails.start_time)
+                    .toLocaleString('en-IN', {
+                      timeZone: 'Asia/Kolkata',
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true
+                    })
+                }} IST
               </li>
 
-              <!-- 3.4) Calculate cost, passing in the rate -->
-              <li>
-                <strong>Est Cost:</strong>
-                ₹{{ calculateEstCost(spotDetails.start_time, spotDetails.rate_per_hour) }}
-              </li>
+              <li><strong>Estimated Cost:</strong> ₹{{ spotDetails.est_cost.toFixed(2) }}</li>
             </ul>
 
             <div class="text-end">
@@ -513,28 +516,36 @@ export default {
         alert('Update failed: ' + (err.response?.data?.msg || err.message))
       }
     },
-    // ← Here’s where your search methods must live:
+
     performSearch() {
-      const q = this.searchQuery.trim().toLowerCase();
-      if (!q) {
-        this.parkingLots = this.allParkingLots;
-        return;
-      }
-      this.parkingLots = this.allParkingLots.filter(lot => {
-        if (this.searchBy === 'location') {
-          return lot.location.toLowerCase().includes(q);
-        }
-        if (this.searchBy === 'pincode') {
-          return lot.pincode.toLowerCase().includes(q);
-        }
-        if (this.searchBy === 'userId') {
-          return lot.spots.some(
-            s => !s.is_available && String(s.reserved_by).toLowerCase() === q
-          );
+  const q = this.searchQuery.trim().toLowerCase();
+  if (!q) {
+    this.parkingLots = this.allParkingLots;
+    return;
+  }
+
+  this.parkingLots = this.allParkingLots.filter(lot => {
+    if (this.searchBy === 'location') {
+      return lot.location.toLowerCase().includes(q);
+    }
+    if (this.searchBy === 'pincode') {
+      return lot.pincode.toLowerCase().includes(q);
+    }
+    if (this.searchBy === 'userId') {
+      return lot.spots.some(spot => {
+        if (!spot.is_available && spot.reservation_details) {
+          const fullname = (spot.reservation_details.fullname || '').toLowerCase();
+          const email = (spot.reservation_details.email || '').toLowerCase();
+          // Require exact match for either full name or email
+          return fullname === q || email === q;
         }
         return false;
       });
-    },
+    }
+    return false;
+  });
+},
+
 
 
     // 2.1) Format any ISO UTC string into IST display
@@ -678,7 +689,10 @@ export default {
           location: lot.location,
           pincode: lot.pincode,
           price_per_hour: lot.price_per_hour,
-          spots: lot.spots
+          spots: lot.spots.map(spot => ({
+            ...spot,
+            reservation_details: spot.reservation_details || null
+          }))
         }))
 
         this.allParkingLots = this.parkingLots

@@ -14,6 +14,12 @@ import math
 from sqlalchemy import func
 from math import ceil
 import traceback
+from datetime import datetime, timezone
+from math import ceil
+from flask_jwt_extended import get_jwt, verify_jwt_in_request
+
+
+
 
 
 app = Flask(__name__)
@@ -84,6 +90,16 @@ def admin_required_route(fn):
         return fn(*args, **kwargs)
     return wrapper
 
+# ✅ 1. Define a decorator that only allows users (not admins)
+def user_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        verify_jwt_in_request()
+        claims = get_jwt()
+        if claims.get('role') != 'user':
+            return jsonify({"msg": "Only regular users can perform this action"}), 403
+        return fn(*args, **kwargs)
+    return wrapper
 
 # ============================
 #          ROUTES
@@ -94,6 +110,7 @@ def home():
     return jsonify({"msg": "Parking App API is running"})
 
 
+# ✅ 2. Patch your /register route to issue role in JWT
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json() or {}
@@ -104,14 +121,12 @@ def register():
     address  = data.get('address')
     pincode  = data.get('pincode')
 
-    # validate
     if not all([fullname, email, password, address, pincode]):
         return jsonify({"msg": "All fields (fullname, email, password, address, pincode) are required"}), 400
 
     if User.query.filter_by(email=email).first():
         return jsonify({"msg": "Email already exists"}), 409
 
-    # hash & create
     hashed_pw = generate_password_hash(password)
     new_user = User(
         fullname=fullname,
@@ -124,7 +139,8 @@ def register():
     db.session.add(new_user)
     db.session.commit()
 
-    token = create_access_token(identity=str(new_user.id))
+    # ➕ Inject role claim into the JWT
+    token = create_access_token(identity=str(new_user.id), additional_claims={'role': 'user'})
     return jsonify({
         "msg": "Registration successful",
         "access_token": token,
@@ -162,7 +178,7 @@ def delete_parking_lot(lot_id):
         return jsonify(msg=str(e)), 500
 
 
-# ─── Login Route ─────────────────────────────────────────────────────────────────
+# ✅ 3. Patch your /login route to also include role in the JWT
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json() or {}
@@ -177,12 +193,14 @@ def login():
     if not user or not check_password_hash(user.password, password):
         return jsonify({"msg": "Invalid credentials"}), 401
 
-    token = create_access_token(identity=str(user.id))
+    # ➕ Use role from DB in the JWT
+    token = create_access_token(identity=str(user.id), additional_claims={'role': user.role})
     return jsonify({
         "access_token": token,
         "email": user.email,
         "role": user.role
     }), 200
+
 
 @app.route('/admin/lots', methods=['POST'])
 @jwt_required()
@@ -263,20 +281,36 @@ def get_spot_details(lot_id, spot_id):
         return jsonify(msg="Spot is available"), 400
 
     # find the active reservation
-    resv = Reservation.query.filter_by(spot_id=spot_id, end_time=None).first()
+    from sqlalchemy import desc
+ 
+    resv = (
+   Reservation.query
+     .filter_by(spot_id=spot_id, end_time=None)
+     .order_by(desc(Reservation.start_time))
+     .first()
+ )
     if not resv:
         return jsonify(msg="No active reservation"), 404
 
-    hours    = (datetime.utcnow() - resv.start_time).total_seconds() / 3600
-    est_cost = round(hours * spot.lot.price_per_hour, 2)
+    # make the stored start_time timezone-aware (treat stored UTC as UTC)
+    start_aware = resv.start_time.replace(tzinfo=timezone.utc)
+    now         = datetime.now(timezone.utc)
+    raw_hours = (now - start_aware).total_seconds() / 3600
 
+    billed_hours = max(1, ceil(raw_hours))
+
+    est_cost = round(billed_hours * spot.lot.price_per_hour, 2)
+
+    user = resv.user
     return jsonify({
-      'id':           resv.id,
-      'customer_id':  resv.user_id,
-      'vehicle_no':   resv.vehicle_number,
-      'start_time':   resv.start_time.isoformat(),
-      'est_cost':     est_cost
-    }), 200
+  'customer_id':  resv.user_id,
+  'fullname':     user.fullname,
+  'email':        user.email,
+  'vehicle_no':   resv.vehicle_number,
+  'start_time': start_aware.isoformat(),  # e.g. "2025-07-27T15:23:00+00:00"
+  'est_cost':     est_cost
+}), 200
+
 
 @app.route('/admin/spot/<int:spot_id>', methods=['DELETE'])
 @jwt_required()
@@ -360,9 +394,9 @@ def delete_spot(lot_id, spot_id):
 
 
 @app.route('/user/reserve', methods=['POST'], endpoint='user_confirm_reservation')
-@jwt_required()
+@user_required
 def user_confirm_reservation():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     data = request.get_json() or {}
 
     resv_id = data.get('reservation_id')
@@ -586,23 +620,41 @@ def admin_dashboard():
     # 2) Fetch all lots created by this admin
     lots = ParkingLot.query.filter_by(created_by=admin_id).all()
 
-    # 3) Build the parking_lots list
+     # 3) Build the parking_lots list with reservation details
     lot_list = []
     for lot in lots:
+        spots_list = []
+        for spot in lot.spots:
+            spot_data = {
+                'id': spot.id,
+                'number': spot.spot_number,
+                'is_available': not spot.is_reserved
+            }
+            
+            # Add reservation details if spot is occupied
+            if spot.is_reserved:
+                active_reservation = Reservation.query.filter_by(
+                    spot_id=spot.id,
+                    end_time=None
+                ).first()
+                
+                if active_reservation:
+                    user = active_reservation.user
+                    spot_data['reservation_details'] = {
+    'user_id': user.id,
+    'fullname': user.fullname,  # Exact full name
+    'email': user.email         # Exact email
+}
+            
+            spots_list.append(spot_data)
+        
         lot_list.append({
-            'id':             lot.id,
-            'name':           lot.name,
-            'location':       lot.location,
-            'pincode':        lot.pincode,
+            'id': lot.id,
+            'name': lot.name,
+            'location': lot.location,
+            'pincode': lot.pincode,
             'price_per_hour': lot.price_per_hour,
-            'spots': [
-                {
-                    'id':           spot.id,
-                    'number':       spot.spot_number,
-                    'is_available': not spot.is_reserved
-                }
-                for spot in lot.spots
-            ]
+            'spots': spots_list
         })
 
     # 4) Build the lot_summary list (for your pie chart)
@@ -749,21 +801,12 @@ def admin_list_users():
 
 
 @app.route('/user/assign', methods=['POST'])
-@jwt_required()
+@user_required
 def assign_spot():
-    # 1) Strongly type your identity and load the user
-    try:
-        user_id = int(get_jwt_identity())
-    except (TypeError, ValueError):
-        return jsonify(msg='Invalid user identity'), 400
-
+    user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
-    if not user:
-        return jsonify(msg='User not found'), 404
-
-    # 2) Refuse if this isn’t a “regular” user
-    if user.role != 'user':
-        return jsonify(msg='Only end-users can reserve spots'), 403
+    if not user or user.role != 'user':
+        return jsonify(msg='Unauthorized'), 403
 
     # 3) Now proceed exactly as before
     data   = request.get_json() or {}
@@ -802,7 +845,7 @@ def assign_spot():
 
 
 @app.route('/api/reservations/confirm', methods=['POST'], endpoint='api_confirm_reservation')
-@jwt_required()
+@user_required     
 def api_confirm_reservation():
 
     user_id = get_jwt_identity()
