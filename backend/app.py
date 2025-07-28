@@ -8,7 +8,7 @@ from flask_jwt_extended import (
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-from models import db, User, ParkingLot, ParkingSpot, Reservation
+from backend.models import db, User, ParkingLot, ParkingSpot, Reservation
 from flask import request
 import math
 from sqlalchemy import func
@@ -17,17 +17,34 @@ import traceback
 from datetime import datetime, timezone
 from math import ceil
 from flask_jwt_extended import get_jwt, verify_jwt_in_request
-
+from flask import Flask
+from flask_mail import Mail
+from flask_mail import Message
+# ✅ Add this at the top of app.py
+from backend.celery_worker import celery
+from backend.extensions import mail  # use shared instance
 
 
 
 
 app = Flask(__name__)
+app.config.update(
+    MAIL_SERVER='smtp.gmail.com',
+    MAIL_PORT=465,
+MAIL_USE_SSL=True,
+MAIL_USE_TLS=False,
+    MAIL_USERNAME='sugisubramanii@gmail.com',
+    MAIL_PASSWORD='rphs nflb vdqv hxly',  # your 16‑char app password
+    MAIL_DEFAULT_SENDER='sugisubramanii@gmail.com'
+)
+
+mail = Mail(app)
 
 # ----- Configuration -----
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///parking.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'super-secret-key'
+
 
 # CORS config
 CORS(app,
@@ -37,7 +54,7 @@ CORS(app,
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # ----- Initialize Extensions -----
-db.init_app(app)
+db.init_app(app)                  
 migrate = Migrate(app, db)
 jwt = JWTManager(app)
 
@@ -90,6 +107,17 @@ def admin_required_route(fn):
         return fn(*args, **kwargs)
     return wrapper
 
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object('config')  # Move your configs here
+    
+    from backend.extensions import db, mail, jwt
+    db.init_app(app)
+    mail.init_app(app)
+    jwt.init_app(app)
+    
+    return app
+
 # ✅ 1. Define a decorator that only allows users (not admins)
 def user_required(fn):
     @wraps(fn)
@@ -108,6 +136,19 @@ def user_required(fn):
 @app.route('/')
 def home():
     return jsonify({"msg": "Parking App API is running"})
+
+@app.route('/test-email')
+def test_email():
+    try:
+        msg = Message(
+            "Test Email",
+            recipients=["your-email@gmail.com"],  # Use your actual email
+            body="This is a test email."
+        )
+        mail.send(msg)
+        return jsonify({"status": "Test email sent"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ✅ 2. Patch your /register route to issue role in JWT
@@ -415,10 +456,32 @@ def user_confirm_reservation():
 
     reservation.vehicle_number = vehicle
     reservation.start_time = reservation.start_time or datetime.utcnow()
-
     db.session.commit()
-    return jsonify(msg='Booking confirmed'), 200
 
+    # Prepare greeting name (fallback to email)
+    recipient_name = reservation.user.fullname
+
+    from backend.tasks.background import send_booking_email
+    send_booking_email.delay(
+    reservation.user.email,
+    f"""Dear {reservation.user.fullname},
+
+Your reservation has been successfully confirmed on ParkWise.
+
+• Spot Number: #{reservation.spot_id}  
+• Vehicle Number: {reservation.vehicle_number}  
+• Start Time: {reservation.start_time.strftime('%Y-%m-%d %H:%M:%S')}
+
+Please ensure your vehicle is parked within the reserved timeframe.  
+For any changes, visit your ParkWise dashboard.
+
+Thank you for choosing ParkWise!
+
+Best regards,  
+The ParkWise Team"""
+)
+
+    return jsonify(msg='Booking confirmed'), 200
 
 
 
@@ -534,13 +597,9 @@ def get_all_lots():
     return jsonify(result), 200
 
 
-
-
-
 @app.route('/user/release', methods=['POST'])
 @jwt_required()
 def release_reservation():
-    # Force user_id to an integer
     try:
         user_id = int(get_jwt_identity())
     except (TypeError, ValueError):
@@ -549,44 +608,58 @@ def release_reservation():
     data = request.get_json()
     reservation_id = data.get('reservation_id')
 
-    # Debug logging
-    print(f"[DEBUG] user_id={user_id}, release payload:", data)
-
     reservation = Reservation.query.get(reservation_id)
     if not reservation or reservation.user_id != user_id:
         return jsonify({"msg": "Reservation not found or unauthorized"}), 404
 
-    # Mark spot as available
     spot = ParkingSpot.query.get(reservation.spot_id)
     if spot:
         spot.is_reserved = False
 
-    # Set end time
     reservation.end_time = datetime.utcnow()
 
-    # Calculate duration in hours, always round up to 1+ hour for billing
     duration_hours = (reservation.end_time - reservation.start_time).total_seconds() / 3600
     billed_hours = max(1, ceil(duration_hours))
 
-    # ✅ Fetch lot and use its dynamic price_per_hour
     lot = ParkingLot.query.get(reservation.lot_id)
-    print(f"[DEBUG] Lot price per hour: ₹{lot.price_per_hour}")
     if not lot:
         return jsonify({"msg": "Parking lot not found"}), 404
 
-    cost_per_hour = lot.price_per_hour
-    reservation.cost = round(billed_hours * cost_per_hour, 2)
-
+    reservation.cost = round(billed_hours * lot.price_per_hour, 2)
     db.session.commit()
+
+    recipient_name = reservation.user.fullname
+
+    from backend.tasks.background import send_release_email
+    send_release_email.delay(
+    reservation.user.email,
+    f"""Dear {reservation.user.fullname},
+
+You've successfully released your reserved parking spot on ParkWise.
+
+• Spot Number: #{reservation.spot_id}  
+• Duration Parked: {round(duration_hours, 2)} hours  
+• Billed Hours: {billed_hours}  
+• Total Cost: ₹{reservation.cost:.2f}
+
+Please note: As part of ParkWise's standard billing system, sessions are billed with a minimum duration of 1 hour.
+
+We hope to serve you again soon.
+
+Warm regards,  
+The ParkWise Team"""
+)
 
     return jsonify({
         "msg": "Reservation released",
         "duration": round(duration_hours, 2),
         "billed_hours": billed_hours,
-        "price_per_hour": cost_per_hour,
+        "price_per_hour": lot.price_per_hour,
         "cost": reservation.cost,
-        "price_per_hour": lot.price_per_hour
     }), 200
+
+
+
 
 @app.route('/admin/lots/<int:lot_id>', methods=['PUT'])
 @jwt_required()

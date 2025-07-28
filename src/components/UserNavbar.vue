@@ -1,55 +1,61 @@
 <template>
-  <nav class="navbar bg-white shadow-sm px-4 py-2 position-relative">
-    <!-- Brand (Left) -->
-    <div class="d-flex align-items-center">
-      <router-link
-        :to="dashboardRoute"
-        class="navbar-brand d-flex align-items-center mb-0 text-dark text-decoration-none"
+  <nav class="navbar navbar-expand-md bg-white shadow-sm py-2 px-3 sticky-top modern-navbar">
+    <!-- Brand -->
+    <router-link
+      :to="dashboardRoute"
+      class="navbar-brand d-flex align-items-center gap-2 text-dark fw-bold"
+    >
+      <img src="/images/parkwisee.png" alt="Parkwise Logo" class="logo-img" />
+    </router-link>
+
+    <!-- Toggle button for mobile -->
+    <button
+      class="navbar-toggler border-0"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#navbarNav"
+    >
+      <i class="bi bi-list fs-3 text-dark"></i>
+    </button>
+
+    <!-- Nav Links -->
+    <div class="collapse navbar-collapse justify-content-center" id="navbarNav">
+      <ul class="navbar-nav gap-3">
+        <li class="nav-item">
+          <router-link to="/user/dashboard" class="nav-link modern-link">Home</router-link>
+        </li>
+        <li class="nav-item">
+          <router-link to="/user/reservations" class="nav-link modern-link">Reservations</router-link>
+        </li>
+        <li class="nav-item">
+          <router-link to="/user/summary" class="nav-link modern-link">Summary</router-link>
+        </li>
+      </ul>
+    </div>
+
+    <!-- User Dropdown -->
+    <div v-if="username" class="dropdown ms-auto">
+      <button
+        class="btn btn-outline-light d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm user-button"
+        type="button"
+        data-bs-toggle="dropdown"
       >
-        <img src="/images/parkwisee.png" alt="Parkwise Logo" class="logo-img" />
-      </router-link>
-    </div>
-
-    <!-- Nav Links (Perfectly Centered) -->
-    <div class="position-absolute top-50 start-50 translate-middle d-flex gap-4">
-      <router-link to="/user/dashboard" class="nav-link text-dark fw-semibold">
-        Home
-      </router-link>
-      <router-link to="/user/reservations" class="nav-link text-dark fw-semibold">
-        Reservations
-      </router-link>
-      <router-link to="/user/summary" class="nav-link text-dark fw-semibold">
-        Summary
-      </router-link>
-    </div>
-
-    <!-- User Dropdown (Right-aligned) -->
-    <div class="ms-auto d-flex align-items-center" v-if="username">
-      <div class="dropdown">
-        <button
-          class="btn btn-light dropdown-toggle d-flex align-items-center"
-          type="button"
-          id="userMenu"
-          data-bs-toggle="dropdown"
-          aria-expanded="false"
-        >
-          <i class="bi bi-person-circle me-2 fs-5"></i>
-          <span class="fw-semibold">{{ username }}</span>
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-          <li>
-            <router-link to="/user/profile" class="dropdown-item">
-              Profile
-            </router-link>
-          </li>
-          <li><hr class="dropdown-divider" /></li>
-          <li>
-            <a class="dropdown-item" href="#" @click.prevent="logout">
-              Logout
-            </a>
-          </li>
-        </ul>
-      </div>
+        <i class="bi bi-person-circle fs-5 text-primary"></i>
+        <span class="fw-semibold text-dark d-none d-sm-inline">{{ username }}</span>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end shadow-sm rounded-3 mt-2">
+        <li>
+          <router-link to="/user/profile" class="dropdown-item">
+            <i class="bi bi-person me-2"></i> Profile
+          </router-link>
+        </li>
+        <li><hr class="dropdown-divider" /></li>
+        <li>
+          <a class="dropdown-item text-danger" href="#" @click.prevent="logout">
+            <i class="bi bi-box-arrow-right me-2"></i> Logout
+          </a>
+        </li>
+      </ul>
     </div>
   </nav>
 </template>
@@ -77,39 +83,43 @@ export default {
 .logo-img {
   height: 32px;
   object-fit: contain;
-  display: block;
 }
 
-.navbar-brand:hover,
-.nav-link:hover {
-  color: #0d6efd !important;
-  text-decoration: none;
+.modern-navbar {
+  backdrop-filter: blur(8px);
+  background-color: rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  z-index: 1050;
 }
 
-.nav-link {
+.modern-link {
+  font-weight: 500;
   font-size: 0.95rem;
-  text-decoration: none;
+  color: #212529 !important;
+  position: relative;
+  transition: color 0.2s ease;
 }
 
-.navbar {
-  min-height: 56px;
+.modern-link::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  height: 2px;
+  background-color: #0d6efd;
+  transition: width 0.3s ease;
+}
+
+.modern-link:hover::after {
+  width: 100%;
+}
+
+.user-button:hover {
+  background-color: #f8f9fa;
 }
 
 .dropdown-menu {
   font-size: 0.9rem;
-}
-
-@media (max-width: 768px) {
-  .navbar {
-    flex-wrap: wrap;
-  }
-
-  .nav-links {
-    position: static !important;
-    transform: none !important;
-    margin-top: 0.5rem;
-    justify-content: center;
-    width: 100%;
-  }
 }
 </style>

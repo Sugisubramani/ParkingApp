@@ -1,69 +1,60 @@
-
 <template>
-  <div v-if="loading" class="loader-container">
+  <div v-if="loading" class="d-flex flex-column align-items-center justify-content-center min-vh-100 bg-white">
     <div class="spinner-border text-primary" role="status"></div>
-    <p class="loader-text">Loading parking lots…</p>
+    <p class="mt-3 text-muted">Loading parking lots…</p>
   </div>
 
-  <div v-else-if="error" class="alert alert-danger text-center mt-4">
+  <div v-else-if="error" class="alert alert-danger text-center m-4">
     {{ error }}
   </div>
 
-  <div v-else class="dashboard-wrapper bg-light d-flex flex-column min-vh-100">
+  <div v-else class="bg-light min-vh-100 d-flex flex-column">
     <UserNavbar :username="user.username || user.email" />
 
     <!-- Booking Modal -->
-    <div class="booking-modal" v-if="showModal" @click.self="closeModal">
-      <div class="modal-dialog">
+    <div class="modal fade show d-block" v-if="showModal" tabindex="-1" @click.self="closeModal">
+      <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow rounded-4">
-          <div class="modal-header bg-dark text-white px-4 py-3">
-            <h5 class="modal-title fw-semibold">Confirm Parking Spot</h5>
-            <button type="button" class="btn-close btn-close-white" @click="closeModal" />
+          <div class="modal-header bg-dark text-white">
+            <h5 class="modal-title">Confirm Parking Spot</h5>
+            <button type="button" class="btn-close btn-close-white" @click="closeModal"></button>
           </div>
-          <div class="modal-body px-4 py-3">
-            <div class="mb-3">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="text-muted">Parking Lot</span>
-                <strong>{{ bookingData.lotName }}</strong>
-              </div>
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="text-muted">Spot Number</span>
-                <strong>#{{ bookingData.spotNumber }}</strong>
-              </div>
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="text-muted">User ID</span>
-                <strong>{{ bookingData.userId }}</strong>
-              </div>
-
-              <div class="d-flex flex-column justify-content-between mb-3">
-                <div class="d-flex justify-content-between align-items-center w-100">
-                  <span class="text-muted">Rate per Hour</span>
-                  <strong class="text-success">₹{{ bookingData.cost }}</strong>
-                </div>
-                <small class="text-secondary">
-                  Minimum billing unit: 1 hour (you’ll be charged for a full hour even if you leave sooner)
-                </small>
-              </div>
-
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="text-muted">Start Time</span>
-                <strong>{{ formatDateIST(bookingData.startTime) }}</strong>
-              </div>
+          <div class="modal-body">
+            <div class="mb-2 d-flex justify-content-between">
+              <span class="text-muted">Parking Lot:</span>
+              <strong>{{ bookingData.lotName }}</strong>
+            </div>
+            <div class="mb-2 d-flex justify-content-between">
+              <span class="text-muted">Spot Number:</span>
+              <strong>#{{ bookingData.spotNumber }}</strong>
+            </div>
+            <div class="mb-2 d-flex justify-content-between">
+              <span class="text-muted">User ID:</span>
+              <strong>{{ bookingData.userId }}</strong>
+            </div>
+            <div class="mb-2 d-flex justify-content-between">
+              <span class="text-muted">Rate per Hour:</span>
+              <strong class="text-success">₹{{ bookingData.cost }}</strong>
+            </div>
+            <small class="text-secondary d-block mb-3">
+              Minimum billing unit: 1 hour (you’ll be charged for a full hour even if you leave sooner)
+            </small>
+            <div class="mb-2 d-flex justify-content-between">
+              <span class="text-muted">Start Time:</span>
+              <strong>{{ formatDateIST(bookingData.startTime) }}</strong>
             </div>
             <hr />
-            <div class="mb-3">
-              <label class="form-label fw-semibold">Enter Vehicle Number</label>
-              <input
-                v-model="vehicleNumber"
-                type="text"
-                class="form-control form-control-lg shadow-sm"
-                placeholder="e.g. TN01AB1234"
-              />
-            </div>
+            <label class="form-label fw-semibold">Enter Vehicle Number</label>
+            <input
+              v-model="vehicleNumber"
+              type="text"
+              class="form-control form-control-lg shadow-sm"
+              placeholder="e.g. TN01AB1234"
+            />
           </div>
-          <div class="modal-footer bg-light px-4 py-3 d-flex justify-content-between">
+          <div class="modal-footer">
             <button class="btn btn-outline-dark" @click="closeModal">Cancel</button>
-            <button class="btn btn-success px-4" :disabled="!vehicleNumber" @click="confirmBooking">
+            <button class="btn btn-success" :disabled="!vehicleNumber" @click="confirmBooking">
               Confirm Booking
             </button>
           </div>
@@ -72,65 +63,59 @@
     </div>
 
     <!-- Main Content -->
-    <section class="main-content flex-grow-1 py-4 d-flex justify-content-center overflow-auto">
-      <div class="container-lg px-3">
-        <!-- Search Row -->
-        <div class="row align-items-center g-3 mb-4 search-row">
-          <div class="col-auto">
-            <select v-model="searchField" class="form-select styled-dropdown">
-              <option value="name">Lot Name</option>
-              <option value="location">Address</option>
-              <option value="pincode">Pincode</option>
-            </select>
-          </div>
-          <div class="col">
-            <input
-              v-model="searchQuery"
-              type="text"
-              class="form-control shadow-sm"
-              placeholder="Search..."
-            />
-          </div>
+    <main class="container-lg flex-grow-1 py-4">
+      <!-- Search -->
+      <div class="row g-3 align-items-center mb-4">
+        <div class="col-auto">
+          <select v-model="searchField" class="form-select">
+            <option value="name">Lot Name</option>
+            <option value="location">Address</option>
+            <option value="pincode">Pincode</option>
+          </select>
         </div>
-
-        <!-- Heading -->
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h4 class="fw-bold">Available Parking Lots</h4>
+        <div class="col">
+          <input v-model="searchQuery" type="text" class="form-control shadow-sm" placeholder="Search..." />
         </div>
+      </div>
 
-        <!-- Lots Grid -->
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-          <div v-for="lot in filteredLots" :key="lot.id" class="col">
-            <div class="card h-100 border-0 shadow-sm rounded-3">
-              <div class="card-body d-flex flex-column justify-content-between">
-                <div>
-                  <h5 class="card-title mb-2 fw-semibold">{{ lot.name }}</h5>
-                  <p class="text-muted small mb-0">{{ lot.location }}</p>
-                  <p class="text-muted small mb-3">Pincode: {{ lot.pincode || 'N/A' }}</p>
-                  <ul class="list-unstyled mb-0 small">
-                    <li><strong>Total:</strong> {{ lot.total_spots }}</li>
-                    <li><strong>Free:</strong> {{ lot.available_spots }}</li>
-                    <li>
-                      <strong>Rate:</strong> ₹{{ lot.price_per_hour }}
-                      <small class="text-muted">/hr (min 1 hr)</small>
-                    </li>
-                  </ul>
-                </div>
-                <button
-                  class="btn btn-outline-primary mt-3 w-100"
-                  :disabled="lot.available_spots === 0"
-                  @click="openBookingModal(lot)"
-                >
-                  Book Spot
-                </button>
+      <!-- Title -->
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold">Available Parking Lots</h4>
+      </div>
+
+      <!-- Cards -->
+      <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        <div v-for="lot in filteredLots" :key="lot.id" class="col">
+          <div class="card h-100 border-0 shadow-sm rounded-4">
+            <div class="card-body d-flex flex-column">
+              <div class="mb-3">
+                <h5 class="card-title mb-1 fw-semibold">{{ lot.name }}</h5>
+                <div class="text-muted small">{{ lot.location }}</div>
+                <div class="text-muted small mb-2">Pincode: {{ lot.pincode || 'N/A' }}</div>
+                <ul class="list-unstyled small">
+                  <li><strong>Total Spots:</strong> {{ lot.total_spots }}</li>
+                  <li><strong>Available:</strong> {{ lot.available_spots }}</li>
+                  <li>
+                    <strong>Rate:</strong> ₹{{ lot.price_per_hour }}
+                    <small class="text-muted">/hr</small>
+                  </li>
+                </ul>
               </div>
+              <button
+                class="btn btn-outline-primary mt-auto"
+                :disabled="lot.available_spots === 0"
+                @click="openBookingModal(lot)"
+              >
+                Book Spot
+              </button>
             </div>
           </div>
         </div>
       </div>
-    </section>
+    </main>
   </div>
 </template>
+
 
 <script>
 import axios from 'axios'
