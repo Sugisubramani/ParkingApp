@@ -45,7 +45,7 @@
         </div>
         <div class="text-center mt-4">
           <button class="btn btn-outline-success" @click="exportCSV">
-            📦 Download My Reservation History (CSV)
+            📦 Download Reservation History (CSV)
           </button>
         </div>
       </div>
