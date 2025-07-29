@@ -7,8 +7,7 @@
     <div class="main-content flex-grow-1 bg-light overflow-auto">
 
       <!-- Profile / Edit in one pane -->
-      <div v-if="currentView === 'profile'" class="d-flex justify-content-center align-items-center"
-        style="height:100%">
+      <div v-if="currentView === 'profile'" class="d-flex justify-content-center align-items-center" style="height:100%">
         <div class="card profile-card p-4 shadow-sm">
           <h4 class="mb-4 text-center">Admin Profile</h4>
           <form @submit.prevent="saveProfile">
@@ -34,69 +33,92 @@
       </div>
 
       <!-- Dashboard View -->
-      <div v-else-if="currentView === 'dashboard'" class="p-4">
-        <!-- STATS GRID -->
-        <div class="row g-4 mb-5 text-center">
-          <div class="col-6 col-md-4 col-xl-2" v-for="(label, key) in {
-            'Total Lots': 'totalLots',
-            'Total Spots': 'totalSpots',
-            Available: 'availableSpots',
-            Reserved: 'reservedSpots',
-            'Total Users': 'totalUsers',
-            'Total Revenue': 'totalRevenue'
-          }" :key="key">
-            <div class="card shadow-sm border-0">
-              <div class="card-body py-3">
-                <h6 class="card-subtitle mb-1 text-muted">{{ key }}</h6>
-                <h4 class="card-title mb-0 fw-bold" :class="{
-                  'text-primary': key === 'Total Lots',
-                  'text-success': key === 'Total Spots',
-                  'text-info': key === 'Available',
-                  'text-danger': key === 'Reserved',
-                  'text-dark': key === 'Total Users',
-                  'text-warning': key === 'Total Revenue'
-                }">
-                  {{ key === 'Total Users'
-                    ? totalUsers
-                    : key === 'Total Revenue'
-                      ? '₹ ' + (typeof totalRevenue === 'number'
-                        ? totalRevenue.toFixed(2)
-                        : '0.00')
-                      : stats[label]
-                  }}
-                </h4>
-              </div>
-            </div>
-          </div>
+<div v-else-if="currentView === 'dashboard'" class="p-3" style="max-height: 100vh; overflow-y: auto;">
+
+  <!-- STATS CARDS -->
+  <div class="row g-3 mb-3 text-center">
+    <div
+      class="col-6 col-md-3 col-lg-1-7"
+      v-for="(label, key) in {
+        'Total Lots': 'totalLots',
+        'Total Spots': 'totalSpots',
+        Available: 'availableSpots',
+        Reserved: 'reservedSpots',
+        'Total Users': 'totalUsers',
+        'Total Revenue': 'totalRevenue',
+        'Monthly Revenue': 'monthlyRevenue'
+      }"
+      :key="key"
+    >
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body py-2 px-2">
+          <h6 class="card-subtitle mb-1 text-muted small">{{ key }}</h6>
+          <h6
+            class="card-title mb-0 fw-bold small"
+            :class="{
+              'text-primary': key === 'Total Lots',
+              'text-success': key === 'Total Spots',
+              'text-info': key === 'Available',
+              'text-danger': key === 'Reserved',
+              'text-dark': key === 'Total Users',
+              'text-warning': key === 'Total Revenue',
+              'text-success': key === 'Monthly Revenue'
+            }"
+          >
+            {{
+              key === 'Total Users'
+                ? totalUsers
+                : key === 'Total Revenue'
+                ? '₹ ' + totalRevenue.toFixed(2)
+                : key === 'Monthly Revenue'
+                ? '₹ ' + monthlyRevenue.toFixed(2)
+                : stats[label]
+            }}
+          </h6>
         </div>
+      </div>
+    </div>
+  </div>
 
-        <!-- CHARTS -->
-        <div class="row g-4">
-          <!-- Availability Summary Bar Chart -->
-          <div class="col-lg-6">
-            <div class="card shadow-sm border-0 h-100">
-              <div class="card-body">
-                <h5 class="card-title">Availability Summary</h5>
-                <div class="chart-container" style="height:400px; position:relative;">
-                  <canvas ref="availabilityChart" style="width:100%; height:100%;"></canvas>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Revenue by Lot Pie Chart -->
-          <div class="col-lg-6">
-            <div class="card shadow-sm border-0 h-100">
-              <div class="card-body">
-                <h5 class="card-title">Revenue by Lot</h5>
-                <div class="chart-container" style="height:400px; position:relative;">
-                  <canvas ref="revenuePieChart" style="width:100%; height:100%;"></canvas>
-                </div>
-              </div>
-            </div>
+  <!-- CHARTS ROW: Availability + Revenue Pie -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body p-2">
+          <h6 class="card-title mb-2 small">Availability Summary</h6>
+          <div class="chart-container" style="height: 240px;">
+            <canvas ref="availabilityChart" style="width:100%; height:100%;"></canvas>
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body p-2">
+          <h6 class="card-title mb-2 small">Revenue by Lot</h6>
+          <div class="chart-container" style="height: 240px;">
+            <canvas ref="revenuePieChart" style="width:100%; height:100%;"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MONTHLY REVENUE FULL-WIDTH -->
+  <div class="row g-3">
+    <div class="col-12">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body p-2">
+          <h6 class="card-title mb-2 small">Monthly Revenue</h6>
+          <div class="chart-container" style="height: 240px;">
+            <canvas ref="monthlyRevenueChart" style="width:100%; height:100%;"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 
       <!-- Bookings View -->
@@ -439,6 +461,11 @@ export default {
       bookings: [],
       totalUsers: 0,
       totalRevenue: 0,
+      monthlyRevenue: 0,
+      monthlyRevenueData: {
+        labels: [],
+        data: []
+      },
       showPassword: false,
       profileForm: {
         email: 'admin@example.com',
@@ -518,33 +545,94 @@ export default {
     },
 
     performSearch() {
-  const q = this.searchQuery.trim().toLowerCase();
-  if (!q) {
-    this.parkingLots = this.allParkingLots;
-    return;
-  }
+      const q = this.searchQuery.trim().toLowerCase();
+      if (!q) {
+        this.parkingLots = this.allParkingLots;
+        return;
+      }
 
-  this.parkingLots = this.allParkingLots.filter(lot => {
-    if (this.searchBy === 'location') {
-      return lot.location.toLowerCase().includes(q);
-    }
-    if (this.searchBy === 'pincode') {
-      return lot.pincode.toLowerCase().includes(q);
-    }
-    if (this.searchBy === 'userId') {
-      return lot.spots.some(spot => {
-        if (!spot.is_available && spot.reservation_details) {
-          const fullname = (spot.reservation_details.fullname || '').toLowerCase();
-          const email = (spot.reservation_details.email || '').toLowerCase();
-          // Require exact match for either full name or email
-          return fullname === q || email === q;
+      this.parkingLots = this.allParkingLots.filter(lot => {
+        if (this.searchBy === 'location') {
+          return lot.location.toLowerCase().includes(q);
+        }
+        if (this.searchBy === 'pincode') {
+          return lot.pincode.toLowerCase().includes(q);
+        }
+        if (this.searchBy === 'userId') {
+          return lot.spots.some(spot => {
+            if (!spot.is_available && spot.reservation_details) {
+              const fullname = (spot.reservation_details.fullname || '').toLowerCase();
+              const email = (spot.reservation_details.email || '').toLowerCase();
+              // Require exact match for either full name or email
+              return fullname === q || email === q;
+            }
+            return false;
+          });
         }
         return false;
       });
-    }
-    return false;
-  });
-},
+    },
+
+    calculateRevenues() {
+      // Get all completed bookings with costs
+      const completedBookings = this.bookings.filter(b => b.cost && b.end_time)
+
+      // Calculate total revenue (sum of all completed bookings)
+      this.totalRevenue = completedBookings.reduce((sum, b) => sum + parseFloat(b.cost), 0)
+
+      // Calculate current month's revenue
+      const currentMonth = new Date().getMonth()
+      const currentYear = new Date().getFullYear()
+
+      this.monthlyRevenue = completedBookings
+        .filter(b => {
+          const endDate = new Date(b.end_time)
+          return endDate.getMonth() === currentMonth &&
+            endDate.getFullYear() === currentYear
+        })
+        .reduce((sum, b) => sum + parseFloat(b.cost), 0)
+
+      // Prepare data for monthly chart
+      this.prepareMonthlyRevenueData()
+
+      console.log('Revenue calculated:', {
+        total: this.totalRevenue,
+        monthly: this.monthlyRevenue,
+        bookingsCount: completedBookings.length
+      })
+    },
+
+    prepareMonthlyRevenueData() {
+      const months = [];
+      const revenue = [];
+      const now = new Date();
+
+      // Get last 6 months
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(now);
+        date.setMonth(date.getMonth() - i);
+
+        const monthName = date.toLocaleString('default', { month: 'short' });
+        months.push(monthName);
+
+        // Calculate revenue for this month
+        const monthRevenue = this.bookings
+          .filter(b => {
+            if (!b.cost || !b.end_time) return false;
+            const endDate = new Date(b.end_time);
+            return endDate.getMonth() === date.getMonth() &&
+              endDate.getFullYear() === date.getFullYear();
+          })
+          .reduce((sum, b) => sum + parseFloat(b.cost), 0);
+
+        revenue.push(monthRevenue);
+      }
+
+      this.monthlyRevenueData = {
+        labels: months,
+        data: revenue
+      };
+    },
 
 
 
@@ -568,14 +656,21 @@ export default {
 
     async fetchBookings() {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('token')
         const res = await fetch('http://127.0.0.1:5000/admin/bookings', {
           headers: { Authorization: `Bearer ${token}` }
-        });
-        const payload = await res.json();
-        this.bookings = payload.bookings;
+        })
+        const payload = await res.json()
+        this.bookings = payload.bookings
+
+        // Add validation
+        if (!this.bookings.every(b => typeof b.cost === 'number')) {
+          console.warn('Some bookings have invalid cost values:', this.bookings)
+        }
+
+        this.calculateRevenues()
       } catch (err) {
-        alert('Failed to load bookings: ' + err.message);
+        alert('Failed to load bookings: ' + err.message)
       }
     },
 
@@ -679,10 +774,10 @@ export default {
           headers: { Authorization: `Bearer ${token}` }
         })
         const data = await res.json()
-        console.log('🚀 DASHBOARD PAYLOAD:', data);
+        console.log('🚀 DASHBOARD PAYLOAD:', data)
         if (!res.ok) throw new Error(data.msg || 'Unauthorized')
 
-        // Map in the new fields
+        // Map in the new fields (REMOVE totalRevenue from here)
         this.parkingLots = data.parking_lots.map(lot => ({
           id: lot.id,
           name: lot.name,
@@ -696,19 +791,7 @@ export default {
         }))
 
         this.allParkingLots = this.parkingLots
-
         this.username = data.username || ''
-
-        this.reservedSpots = this.parkingLots.flatMap(lot =>
-          lot.spots
-            .filter(s => !s.is_available)
-            .map(s => ({
-              lotName: lot.name,
-              number: s.number,
-              by: s.reserved_by,
-              at: new Date(s.start_time).toLocaleString()
-            }))
-        )
 
         this.stats = {
           totalLots: data.total_lots,
@@ -716,21 +799,18 @@ export default {
           availableSpots: data.available_spots,
           reservedSpots: data.reserved_spots,
           lotSummary: data.lot_summary
-        };
+        }
 
-        this.totalUsers = data.total_users;    // ← pull from your API payload
-        this.totalRevenue = data.total_revenue;  // ← ditto
+        this.totalUsers = data.total_users
+        // REMOVE this line: this.totalRevenue = data.total_revenue
 
-        console.log('lotSummary from API →', this.stats.lotSummary);
-
-        this.$nextTick(() => this.renderCharts());
+        this.$nextTick(() => this.renderCharts())
       }
       catch (err) {
         alert(err.message)
         this.$router.push('/login')
       }
     },
-
     // Called by pencil icon
     openEditLot(lot) {
       this.editLotForm = {
@@ -973,6 +1053,49 @@ export default {
         }
       });
 
+      // Monthly Revenue Bar Chart
+      const monthlyRevCanvas = this.$refs.monthlyRevenueChart;
+      if (monthlyRevCanvas) {
+        const ctx = monthlyRevCanvas.getContext('2d');
+        if (this._monthlyRevenueChart) this._monthlyRevenueChart.destroy();
+
+        this._monthlyRevenueChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: this.monthlyRevenueData.labels,
+            datasets: [{
+              label: 'Monthly Revenue (₹)',
+              data: this.monthlyRevenueData.data,
+              backgroundColor: '#4e73df'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function (value) {
+                    return '₹' + value;
+                  }
+                }
+              }
+            },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    return '₹' + context.raw.toFixed(2);
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+
       // 2) Revenue Pie Chart
       const pieCanvas = this.$refs.revenuePieChart;
       if (!pieCanvas) {
@@ -990,6 +1113,8 @@ export default {
       const bgColors = this.stats.lotSummary.map(
         (_, i) => palette[i % palette.length]
       );
+
+
 
       this._revenuePieChart = new Chart(pieCtx, {
         type: 'pie',
@@ -1014,7 +1139,8 @@ export default {
   },
 
   mounted() {
-    this.fetchLots()
+    this.fetchLots();
+    this.fetchBookings(); // This will trigger calculateRevenues()
   }
 }
 </script>
@@ -1031,6 +1157,12 @@ export default {
 
 .profile-card {
   max-width: 380px;
+}
+
+/* Add this to your global styles or scoped section */
+.col-lg-1-7 {
+  flex: 0 0 14.2857%;
+  max-width: 14.2857%;
 }
 
 /* Eye icon inside password field */

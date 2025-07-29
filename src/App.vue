@@ -17,10 +17,15 @@ html, body, #app {
   padding: 0;
   overflow: hidden;
 }
+html {
+  overflow-y: scroll;
+}
 
 /* Optional: remove any default spacing from Bootstrap container if you're using one */
 .container {
   padding: 0 !important;
   margin: 0 !important;
 }
+
+
 </style>

@@ -1,6 +1,6 @@
 <template>
   <div class="dashboard-wrapper">
-    <UserNavbar :username="user?.username || 'User'" />
+<UserNavbar v-if="user && user.username" :username="user.username" />
 
     <div class="scroll-area">
       <div v-if="loading" class="loader-container">
@@ -174,7 +174,7 @@ export default {
 
   data() {
     return {
-      user: null,
+      user: { username: '' },
       loading: true,
       error: '',
       showReleaseModal: false,
@@ -444,6 +444,21 @@ export default {
 
 .btn-warning:hover {
   background-color: #e0a800;
+}
+
+/* Add this to your styles */
+.dashboard-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-x: hidden; /* Prevent horizontal scroll during transitions */
+}
+
+.scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem 2rem;
+  width: 100%; /* Ensure consistent width */
 }
 
 .no-reservations {

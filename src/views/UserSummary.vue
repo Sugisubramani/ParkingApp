@@ -40,10 +40,9 @@
       <!-- chart below -->
       <div class="chart-card">
         <h5 class="chart-title">Times Parked by Lot</h5>
-        <div class="chart-container">
+        <div class="chart-container small-chart">
           <canvas ref="timesChart"></canvas>
         </div>
-        <!-- Add this -->
         <div class="text-center mt-4">
           <button class="btn btn-outline-success" @click="exportCSV">
             📦 Download My Reservation History (CSV)
@@ -53,6 +52,7 @@
     </div>
   </div>
 </template>
+
 
 <script>
 import axios from 'axios'
@@ -232,6 +232,12 @@ export default {
   margin-top: .75rem;
   font-size: .95rem;
   color: #666;
+}
+
+.chart-container.small-chart {
+  max-width: 500px;   /* control width */
+  height: 250px;      /* control height */
+  margin: 0 auto;     /* center it */
 }
 
 /* Section Title */

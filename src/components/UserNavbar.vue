@@ -1,20 +1,12 @@
 <template>
   <nav class="navbar navbar-expand-md bg-white shadow-sm py-2 px-3 sticky-top modern-navbar">
     <!-- Brand -->
-    <router-link
-      :to="dashboardRoute"
-      class="navbar-brand d-flex align-items-center gap-2 text-dark fw-bold"
-    >
+    <router-link :to="dashboardRoute" class="navbar-brand d-flex align-items-center gap-2 text-dark fw-bold">
       <img src="/images/parkwisee.png" alt="Parkwise Logo" class="logo-img" />
     </router-link>
 
     <!-- Toggle button for mobile -->
-    <button
-      class="navbar-toggler border-0"
-      type="button"
-      data-bs-toggle="collapse"
-      data-bs-target="#navbarNav"
-    >
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
       <i class="bi bi-list fs-3 text-dark"></i>
     </button>
 
@@ -35,13 +27,12 @@
 
     <!-- User Dropdown -->
     <div v-if="username" class="dropdown ms-auto">
-      <button
-        class="btn btn-outline-light d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm user-button"
-        type="button"
-        data-bs-toggle="dropdown"
-      >
+      <button class="btn btn-outline-light d-flex align-items-center gap-2 rounded-pill px-3 shadow-sm user-button"
+        type="button" data-bs-toggle="dropdown">
         <i class="bi bi-person-circle fs-5 text-primary"></i>
-        <span class="fw-semibold text-dark d-none d-sm-inline">{{ username }}</span>
+        <span class="fw-semibold text-dark d-none d-sm-inline username-placeholder">
+          {{ username || '&nbsp;' }}
+        </span>
       </button>
       <ul class="dropdown-menu dropdown-menu-end shadow-sm rounded-3 mt-2">
         <li>
@@ -49,7 +40,9 @@
             <i class="bi bi-person me-2"></i> Profile
           </router-link>
         </li>
-        <li><hr class="dropdown-divider" /></li>
+        <li>
+          <hr class="dropdown-divider" />
+        </li>
         <li>
           <a class="dropdown-item text-danger" href="#" @click.prevent="logout">
             <i class="bi bi-box-arrow-right me-2"></i> Logout
@@ -114,6 +107,13 @@ export default {
 .modern-link:hover::after {
   width: 100%;
 }
+
+.username-placeholder {
+  display: inline-block;
+  min-width: 80px;
+  text-align: left;
+}
+
 
 .user-button:hover {
   background-color: #f8f9fa;
