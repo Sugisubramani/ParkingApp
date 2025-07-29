@@ -660,7 +660,6 @@ The ParkWise Team"""
 
 
 
-
 @app.route('/admin/lots/<int:lot_id>', methods=['PUT'])
 @jwt_required()
 @admin_required_route
@@ -1004,6 +1003,16 @@ def user_update_profile():
     db.session.commit()
 
     return jsonify(msg="Profile updated successfully"), 200
+
+from backend.tasks.background import export_reservations_to_csv
+
+@app.route('/user/export-history', methods=['POST'])
+@jwt_required()
+def export_history():
+    """Trigger CSV export; user gets an email when ready."""
+    user_id = int(get_jwt_identity())
+    export_reservations_to_csv.delay(user_id)
+    return jsonify({"msg": "Export started. You’ll receive an email shortly."}), 202
 
 
 if __name__ == '__main__':

@@ -43,6 +43,12 @@
         <div class="chart-container">
           <canvas ref="timesChart"></canvas>
         </div>
+        <!-- Add this -->
+        <div class="text-center mt-4">
+          <button class="btn btn-outline-success" @click="exportCSV">
+            📦 Download My Reservation History (CSV)
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -77,20 +83,20 @@ export default {
         || 'User'
     },
     totalReservations() {
-      return this.dataByLot.reduce((sum, l) => sum + (l.times_parked||0), 0)
+      return this.dataByLot.reduce((sum, l) => sum + (l.times_parked || 0), 0)
     },
     totalHours() {
-      const mins = this.dataByLot.reduce((sum, l) => sum + (l.total_time_minutes||0), 0)
+      const mins = this.dataByLot.reduce((sum, l) => sum + (l.total_time_minutes || 0), 0)
       return mins / 60
     },
     totalCost() {
-      return this.dataByLot.reduce((sum, l) => sum + (l.total_cost||0), 0)
+      return this.dataByLot.reduce((sum, l) => sum + (l.total_cost || 0), 0)
     },
     frequentLot() {
       if (!this.dataByLot.length) return ''
       return this.dataByLot
         .slice()
-        .sort((a,b) => (b.times_parked||0) - (a.times_parked||0))[0]
+        .sort((a, b) => (b.times_parked || 0) - (a.times_parked || 0))[0]
         .lot_name
     }
   },
@@ -102,6 +108,25 @@ export default {
   },
 
   methods: {
+
+    exportCSV() {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+      fetch("http://localhost:5000/user/export-history", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      })
+        .then(res => res.json())
+        .then(data => {
+          alert(data.msg || "Export started. Check your email soon.");
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Failed to trigger CSV export.");
+        });
+    },
     renderChart() {
       const canvas = this.$refs.timesChart
       if (!canvas) return
@@ -114,7 +139,7 @@ export default {
       }
 
       const labels = this.dataByLot.map(l => l.lot_name)
-      const data   = this.dataByLot.map(l => l.times_parked)
+      const data = this.dataByLot.map(l => l.times_parked)
 
       this.chart = new Chart(ctx, {
         type: 'bar',
@@ -190,6 +215,7 @@ export default {
   flex-direction: column;
   height: 100vh;
 }
+
 .scroll-area {
   flex: 1;
   overflow-y: auto;
@@ -201,6 +227,7 @@ export default {
   text-align: center;
   margin-top: 4rem;
 }
+
 .loader-text {
   margin-top: .75rem;
   font-size: .95rem;
@@ -223,20 +250,23 @@ export default {
   gap: 1rem;
   margin-bottom: 2rem;
 }
+
 .metric-box {
   background: #fff;
   border-radius: .5rem;
   border-left: 6px solid #0d6efd;
   padding: 1rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
   text-align: center;
 }
+
 .metric-value {
   font-size: 1.5rem;
   font-weight: 700;
   color: #333;
   margin: 0;
 }
+
 .metric-label {
   font-size: .9rem;
   color: #555;
@@ -248,14 +278,16 @@ export default {
   background: #fff;
   border-radius: .5rem;
   padding: 1.5rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
+
 .chart-title {
   margin-bottom: 1rem;
   font-size: 1.125rem;
   font-weight: 600;
   color: #333;
 }
+
 .chart-container {
   position: relative;
   height: 300px;

@@ -44,10 +44,22 @@ class ParkingSpot(db.Model):
     reservations = db.relationship('Reservation', backref='spot', lazy=True)
 class Reservation(db.Model):
     __tablename__ = 'reservation'
-    id            = db.Column(db.Integer, primary_key=True)
-    user_id       = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    lot_id        = db.Column(db.Integer, db.ForeignKey('parking_lot.id'), nullable=False)
-    spot_id       = db.Column(db.Integer, db.ForeignKey('parking_spot.id'), nullable=False)
-    start_time    = db.Column(db.DateTime, default=datetime.utcnow)
-    end_time      = db.Column(db.DateTime, nullable=True)
+    
+    id             = db.Column(db.Integer, primary_key=True)
+    user_id        = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    lot_id         = db.Column(db.Integer, db.ForeignKey('parking_lot.id'), nullable=False)
+    spot_id        = db.Column(db.Integer, db.ForeignKey('parking_spot.id'), nullable=False)
+    start_time     = db.Column(db.DateTime, default=datetime.utcnow)
+    end_time       = db.Column(db.DateTime, nullable=True)
+    released_at    = db.Column(db.DateTime, nullable=True)
+    cost           = db.Column(db.Float, nullable=True)
     vehicle_number = db.Column(db.String(50), nullable=False)
+
+    parking_spot = db.relationship(
+    'ParkingSpot',
+    backref='reservations_for_report',
+    foreign_keys=[spot_id],
+    overlaps="spot,reservations"
+)
+
+
